@@ -30,23 +30,6 @@ import plot
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 
 
-def SavePlot(canvas, saveDir, saveName):
-    savePath = "%s/%s" % (saveDir, saveName)
-    print "savepath = ", savePath
-    saveURL  = savePath.replace("/afs/cern.ch/user/s/","https://cmsdoc.cern.ch/~")
-    saveURL  = saveURL.replace("/public/html/","/")
-    canvas.SaveAs(savePath)
-    savePath = savePath.replace("pdf","root")
-    canvas.SaveAs(savePath)
-    print "=== ", saveURL
-    return
-
-def getDirName():
-    dirName = "TopTag"
-    dirName = dirName.replace(".", "p")
-    dirName = "/afs/cern.ch/user/s/skonstan/public/html/"+dirName
-    return dirName
-
 def main():
     ROOT.gStyle.SetOptStat(0)
     # Definitions
@@ -148,7 +131,7 @@ def main():
     histoList = []
     for lam in lamValues:
         print "Lambda = ", lam
-        loaded_model = load_model('modelANN_lam%s.h5' % (lam))
+        loaded_model = load_model('models/modelANN_lam%s.h5' % (lam))
         loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
         Y = loaded_model.predict(X, verbose=1)
         Ymass = numpy.concatenate((Y, target), axis=1)
@@ -174,7 +157,7 @@ def main():
     
     for i in range(len(histoList)):
         leg.AddEntry(histoList[i], "t#bar{t} (#lambda = %s)" %(lamValues[i]) ,"f")
-        #histoList[i].Scale(1./(histoList[i].Integral()))
+        histoList[i].Scale(1./(histoList[i].Integral()))
         ymax = max(ymax, histoList[i].GetMaximum())
         histoList[i].Draw("HIST same")
         histoList[i].GetXaxis().SetTitle("m_{top}")
@@ -192,16 +175,8 @@ def main():
     tex3.Draw()
     graph = plot.CreateGraph([173., 173.], [0, ymax*1.1])
     graph.Draw("same")
-    dirName = getDirName()
-    if not os.path.exists(dirName):
-        os.mkdir(dirName)
-        print "Directory " , dirName ,  " Created "
-    else:
-        print "Output saved under", dirName
+    dirName = plot.getDirName("TopTag")
         
-    SavePlot(canvas, dirName, "TopMassANN_nEvts.pdf")
-    #canvas.SaveAs("TopMass.pdf")
-
-    
+    plot.SavePlot(canvas, dirName, "TopMassANN.pdf")
     
 main()
