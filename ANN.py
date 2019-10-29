@@ -18,20 +18,29 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.externals import joblib
 import keras.backend as K
-from keras.optimizers import SGD
+from keras.optimizers import SGD, Adam
 from sklearn.metrics import roc_auc_score
 
 import plot
 import func
 
+config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
+                        allow_soft_placement=True, device_count = {'CPU': 1})
+session = tf.Session(config=config)
+K.set_session(session)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 #Default values:
 LAMBDA = 1
 NEPOCHS = 200
+OPTIMIZER = "Adam"
+LR = 0.01 # Default value for SGD
 helpText = "* lambda: Penalty factor for loss function. Describes the mass dependence."
 from optparse import OptionParser
 parser = OptionParser(helpText)
+
+parser.add_option("--lr",dest="lr",  default=LR,  type = float,   help="Learning Rate (Default: %s)" % LR)
+parser.add_option("--opt",dest="opt",  default=OPTIMIZER,   help="Optimizer (Default: %s)" % OPTIMIZER)
 parser.add_option("--lam",dest="lam",  default=LAMBDA,  type = int,   help="Lambda (Default: %s)" % LAMBDA)
 parser.add_option("--nepochs", dest="nepochs", default = NEPOCHS, type = int, help ="Number of epochs (Default: %s)" % NEPOCHS)
 opt, args = parser.parse_args()
@@ -96,7 +105,7 @@ def PlotLossFunction(losses, nepochs, saveDir):
 
     #canvas.SetLogy()
 
-    saveName = "Loss_lam%s.pdf" %(opt.lam)
+    saveName = "Loss_lam%s_opt%s.pdf" %(opt.lam, opt.opt)#str(opt.lr).replace(".","p"))
     plot.SavePlot(canvas, saveDir, saveName)
     canvas.Close()
     return
@@ -242,13 +251,19 @@ D.compile(loss="binary_crossentropy", optimizer="adam")
 # Combined models
 ###################################################
 
-opt_DRf = SGD(momentum=0.0)
+opt_DRf = opt.opt
+opt_DfR = opt.opt
+
+if opt.opt == "SGD":    
+    opt_DRf = SGD(momentum=0.0)
+    opt_DfR = SGD(momentum=0.0)
+
 DRf = Model(inputs=[inputs], outputs=[D(inputs), R(inputs)])
 make_trainable(R, False)
 make_trainable(D, True)
 DRf.compile(loss=[make_loss_D(c=1.0), make_loss_R(c=-lam)], optimizer=opt_DRf)
 
-opt_DfR = SGD(momentum=0.0)
+
 DfR = Model(inputs=[inputs], outputs=[R(inputs)])
 make_trainable(R, True)
 make_trainable(D, False)
