@@ -63,6 +63,10 @@ def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB):
 def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
     ROOT.gStyle.SetOptStat(0)
     canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas.SetLeftMargin(0.12)
+    canvas.SetRightMargin(0.12)
+    canvas.SetTopMargin(0.06)
+    canvas.SetBottomMargin(0.13)
     canvas.cd()
     nbins = htest_s.GetNbinsX()
     # Initialize sigma variables
@@ -97,6 +101,8 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
     graph_s.SetMarkerStyle(8)
     graph_s.SetMarkerSize(0.5)
     graph_s.SetLineWidth(3)
+
+
     graph_b.SetLineColor(ROOT.kRed)
     graph_b.SetMarkerColor(ROOT.kRed)
     graph_b.SetMarkerStyle(8)
@@ -110,7 +116,7 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
     h_signif0=ROOT.TH1F('signif0', '', nbins, 0.0, 1.)
     h_signif1=ROOT.TH1F('signif1', '', nbins, 0.0, 1.)
 
-    sign = []
+    #sign = []
     sigmaSel_s = ROOT.Double(0.0)
     sigmaSel_b = ROOT.Double(0.0)
 
@@ -121,16 +127,9 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
         # Calculate Significance                                                                                                                                                                    
         _sign0 = sSel/math.sqrt(sSel+bSel)
         _sign1 = 2*(math.sqrt(sSel+bSel) - math.sqrt(bSel))
-        sign.append(_sign0)
+        #sign.append(_sign0)
         h_signif0.Fill(htest_s.GetBinCenter(i), _sign0)        
         h_signif1.Fill(htest_s.GetBinCenter(i), _sign1)        
-
-    graph_signif = plot.GetGraph(xvalue, sign, error, error, error, error)
-    #graph_signif = plot.CreateGraph(xvalue, sign)
-    graph_signif.SetLineColor(ROOT.kGreen)
-    graph_signif.SetMarkerColor(ROOT.kGreen)
-    graph_signif.SetMarkerStyle(8)
-    graph_signif.SetMarkerSize(0.4)
 
     h_signif0.SetLineColor(ROOT.kGreen)
     h_signif0.SetMarkerColor(ROOT.kGreen)
@@ -147,7 +146,6 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
 
     graph_s.SetTitle("")
     graph_b.SetTitle("")
-
     
     h_signifScaled0 = h_signif0.Clone("signif0")
     h_signifScaled0.Scale(1./float(maxSignif))
@@ -175,8 +173,21 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
     h_signifScaled0.GetYaxis().SetTitle("Efficiency")
     h_signifScaled1.GetXaxis().SetTitle("Output")
     h_signifScaled1.GetYaxis().SetTitle("Efficiency")
-    #Draw
-
+    
+    ### Put in func
+    h_signifScaled0.GetXaxis().SetLabelSize(0.045)
+    h_signifScaled0.GetXaxis().SetTitleSize(0.05)
+    h_signifScaled0.GetXaxis().SetTitleOffset(1.)
+    h_signifScaled0.GetXaxis().SetTitleFont(42)
+    
+    h_signifScaled0.GetYaxis().SetLabelSize(0.045)
+    h_signifScaled0.GetYaxis().SetTitleSize(0.05)
+    h_signifScaled0.GetYaxis().SetLabelFont(42)
+    h_signifScaled0.GetYaxis().SetLabelOffset(0.007)
+    h_signifScaled0.GetYaxis().SetTitleOffset(1.2)
+    h_signifScaled0.GetYaxis().SetTitleFont(42)
+    
+    #Draw    
     h_signifScaled0.Draw("HIST")
     h_signifScaled1.Draw("HIST SAME")
     graph_s.Draw("P SAME")
@@ -196,10 +207,14 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
     rightAxis.SetLineColor ( signifColor )
     rightAxis.SetLabelColor( signifColor )
     rightAxis.SetTitleColor( signifColor )
-    rightAxis.SetTitleOffset(1.3)
+    rightAxis.SetTitleOffset(1.25)
+    rightAxis.SetLabelOffset(0.005)
+    rightAxis.SetLabelSize(0.04)
+    rightAxis.SetTitleSize(0.045)
     rightAxis.SetTitle( "Significance" )
     rightAxis.Draw()
         
+
     plot.SavePlot(canvas, saveDir, saveName)
     canvas.Close()
     return
@@ -212,6 +227,10 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName):
 def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, saveName):
     ROOT.gStyle.SetOptStat(0)
     canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas.SetLeftMargin(0.12)
+    #canvas.SetRightMargin(0.12)
+    canvas.SetTopMargin(0.06)
+    canvas.SetBottomMargin(0.13)
     canvas.cd()
     canvas.SetLogy()
 
@@ -243,7 +262,19 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     for h in hList:
         h.SetMaximum(ymax*2)        
         h.GetXaxis().SetTitle("Output")
+        h.GetXaxis().SetLabelSize(0.045)
+        h.GetXaxis().SetTitleSize(0.05)
+        h.GetXaxis().SetTitleOffset(1.)
+        h.GetXaxis().SetTitleFont(42)
+
         h.GetYaxis().SetTitle("Entries")
+        h.GetYaxis().SetLabelSize(0.045)
+        h.GetYaxis().SetTitleSize(0.05)
+        h.GetYaxis().SetLabelFont(42)
+        h.GetYaxis().SetLabelOffset(0.007)
+        h.GetYaxis().SetTitleOffset(1.2)
+        h.GetYaxis().SetTitleFont(42)
+
         h.Rebin(10)
         # Legend
         legText, legStyle = plot.GetLegendStyle(h.GetName())
@@ -252,8 +283,8 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
         plot.ApplyStyle(h)
         h.Draw(plot.DrawStyle(h.GetName())+" SAME")
 
-    graph = plot.CreateGraph([0, 0], [0, ymax*1.1])
-    #graph.Draw("same")
+    graph = plot.CreateGraph([0.5, 0.5], [0, ymax*2])
+    graph.Draw("same")
     leg.Draw()
 
     plot.SavePlot(canvas, saveDir, saveName)

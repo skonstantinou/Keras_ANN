@@ -24,12 +24,12 @@ from sklearn.metrics import roc_auc_score
 import plot
 import func
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
                         allow_soft_placement=True, device_count = {'CPU': 1})
 session = tf.Session(config=config)
 K.set_session(session)
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 #Default values:
 LAMBDA = 1
 NEPOCHS = 200
@@ -51,6 +51,17 @@ opt, args = parser.parse_args()
 ###########################################################
 
 def PlotLossFunction(losses, nepochs, saveDir):
+    
+    def ApplyStyle(h, ymin, ymax, color):
+        h.SetLineColor(color)
+        h.SetMarkerColor(color)
+        h.SetMarkerStyle(8)
+        h.SetMarkerSize(0.8)
+        h.SetMaximum(ymax)
+        h.SetMinimum(ymin)
+        h.GetXaxis().SetTitle("# epoch")
+        h.GetYaxis().SetTitle("Loss")
+
     ROOT.gStyle.SetOptStat(0)
     canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
     canvas.cd()
@@ -67,35 +78,14 @@ def PlotLossFunction(losses, nepochs, saveDir):
     ymax = ymax + 1
     ymin = ymin - 1
 
-    hLf.SetLineColor(ROOT.kRed)
-    hLf.SetMarkerColor(ROOT.kRed)
-    hLf.SetMarkerStyle(8)
-    hLf.SetMarkerSize(0.8)
-    hLf.SetMaximum(ymax)
-    hLf.SetMinimum(ymin)
-    hLf.Draw("pa")
-    hLf.GetXaxis().SetTitle("# epoch")
-    hLf.GetYaxis().SetTitle("Loss")
     
-    hLr.SetLineColor(ROOT.kBlue)
-    hLr.SetMarkerColor(ROOT.kBlue)
-    hLr.SetMarkerStyle(8)
-    hLr.SetMarkerSize(0.8)
-    hLr.SetMaximum(ymax)
-    hLr.SetMinimum(ymin)
+    ApplyStyle(hLf, ymin, ymax, ROOT.kRed)
+    ApplyStyle(hLr, ymin, ymax, ROOT.kBlue)
+    ApplyStyle(hLfr, ymin, ymax, ROOT.kGreen+1)
+    
+    hLf.Draw("pa")
     hLr.Draw("p same")
-    hLr.GetXaxis().SetTitle("# epoch")
-    hLr.GetYaxis().SetTitle("Loss")
-
-    hLfr.SetLineColor(ROOT.kGreen)
-    hLfr.SetMarkerColor(ROOT.kGreen)
-    hLfr.SetMarkerStyle(8)
-    hLfr.SetMarkerSize(0.8)
-    hLfr.SetMaximum(ymax)
-    hLfr.SetMinimum(ymin)
     hLfr.Draw("p same")
-    hLfr.GetXaxis().SetTitle("# epoch")
-    hLfr.GetYaxis().SetTitle("Loss")
 
     leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
     leg.AddEntry(hLf, "L_{f}","ple")
@@ -109,6 +99,10 @@ def PlotLossFunction(losses, nepochs, saveDir):
     plot.SavePlot(canvas, saveDir, saveName)
     canvas.Close()
     return
+
+###########################################################
+# Get List of inputs
+###########################################################
 
 def getInputs():
     inputList = []
@@ -133,17 +127,99 @@ def getInputs():
     inputList.append("TrijetSubldgJetMult")
     return inputList
 
+
+###########################################################
+# Get Classifier
+###########################################################
+
+def getClassifier(model_clf, nInputs):
+    model_clf.add(Dense(32, input_dim =  nInputs)) 
+    model_clf.add(Activation('relu'))
+    model_clf.add(Dense(32))
+    model_clf.add(Activation('relu'))
+    model_clf.add(Dense(32))
+    model_clf.add(Activation('relu'))
+    model_clf.add(Dense(1))
+    model_clf.add(Activation('sigmoid'))
+    return model_clf
+
+###########################################################
+# Get Regressor
+###########################################################
+
+#def getRegressor(model_reg,nInputs):    
+def getRegressor(model_clf,model_reg):    
+    print nInputs
+    #model_reg = getClassifier(model_reg, nInputs)
+    model_reg.add(model_clf)
+    model_reg.add(Dense(16))
+    model_reg.add(Activation("relu"))
+    model_reg.add(Dense(1))
+    model_reg.add(Activation("relu"))
+    return model_reg
+
+###########################################################
+# Get Classifier Layers
+###########################################################
+
+def getClassifierLayers(inputs):
+    '''
+    Dx = Dense(32, activation="relu")(inputs)
+    Dx = Dense(32, activation="relu")(Dx)
+    Dx = Dense(32, activation="relu")(Dx)
+    Dx = Dense(1, activation="sigmoid")(Dx)
+    '''
+    Dx = Dense(32)(inputs)
+    Dx = Activation("relu")(Dx)
+    Dx = Dense(32)(Dx)
+    Dx = Activation("relu")(Dx)
+    Dx = Dense(32)(Dx)
+    Dx = Activation("relu")(Dx)
+    Dx = Dense(1)(Dx)
+    Dx = Activation("sigmoid")(Dx)
+    return Dx
+
+###########################################################
+# Get Regressor Layers
+###########################################################
+
+def getRegressorLayers(Dx, inputs):
+    Rx = Dx
+    '''
+    Rx = Dense(16, activation="relu")(Rx)
+    Rx = Dense(1, activation = "relu")(Rx)
+    '''
+    Rx = Dense(16)(Rx)
+    Rx = Activation("relu")(Rx)
+    Rx = Dense(1)(Rx)
+    Rx = Activation("relu")(Rx)    
+    return Rx
+
+###########################################################
+# Make selected layers trainiable / not trainable
+# For not trainable layers, the weights are not updated
+###########################################################
+
 def make_trainable(model, isTrainable):
     model.trainable = isTrainable
     for l in model.layers:
         l.trainable = isTrainable
 
-def make_loss_D(c):
-    def loss_D(y_true, y_pred):
-        return c * K.binary_crossentropy(y_true, y_pred)
-    return loss_D
+###########################################################
+# Get classifier's loss function
+###########################################################
 
-def make_loss_R(c):
+def getLoss_clf(c):
+    def loss_C(y_true, y_pred):
+        return c * K.binary_crossentropy(y_true, y_pred)
+    return loss_C
+
+###########################################################
+# Get regressor's loss function
+# c factor: controls the mass dependence
+###########################################################
+
+def getLoss_reg(c):
     def loss_R(z_true, z_pred):
         return c * keras.losses.mean_squared_logarithmic_error(z_true, z_pred)
     return loss_R
@@ -156,11 +232,7 @@ debug    = 0
 seed     = 1234
 nepochs  = opt.nepochs
 nbatch   = 100
-lam = opt.lam
-
-if 0:
-    nepochs = 10
-    nbatch = 5000
+lam      = opt.lam
 
 # Setting the seed for numpy-generated random numbers
 numpy.random.seed(seed)
@@ -177,75 +249,100 @@ background = uproot.open(filename)["treeB"]
 inputList = getInputs()
 nInputs = len(inputList)
 
-#Signal and background dataframes
+#Get signal and background dataframes and assign signal/background flag
 df_signal     = signal.pandas.df(inputList)
 df_background = background.pandas.df(inputList)
+#
+df_signal = df_signal.assign(signal=1)
+df_background = df_background.assign(signal=0)
 
 nsignal = len(df_signal.index)
 print "=== Number of signal events: ", nsignal
 
-# Concat signal, background datasets
-df_signal = df_signal.assign(signal=1)
-df_background = df_background.assign(signal=0)
-
-#Signal and background datasets
+#Get signal and background datasests
 dset_signal     = df_signal.values
 dset_background = df_background.values
-#
+
+# Get inputs for signal and background
 X_signal     = dset_signal[:nsignal, 0:nInputs]
 X_background = dset_background[:nsignal, 0:nInputs]
 
+# Concat signal, background datasets
 dataset = pandas.concat([df_signal, df_background]).values
 dataset_target_all = pandas.concat([signal.pandas.df(["TrijetMass"]), background.pandas.df(["TrijetMass"])]).values
+
 #Split data into input (X) and output (Y)
 X = dataset[:2*nsignal,0:nInputs]
 Y = dataset[:2*nsignal,nInputs:]
+
+# Get target (top mass)
 target = dataset_target_all[:2*nsignal, :]
 
 numpy.random.seed(seed)
-
-# Define keras models
 
 # Get training and test samples
 X_train, X_test, Y_train, Y_test, target_train, target_test = train_test_split(
     X, Y, target, test_size=0.5, random_state=seed, shuffle=True)
 
+
+###################################################
+# Define classifier
+###################################################
+'''
 inputs = Input(shape=(X_train.shape[1],))
 Dx = Dense(32, activation="relu")(inputs)
 Dx = Dense(32, activation="relu")(Dx)
 Dx = Dense(32, activation="relu")(Dx)
 Dx = Dense(1, activation="sigmoid")(Dx)
 D = Model(inputs=[inputs], outputs=[Dx])
+'''
+inputs = Input(shape=(X_train.shape[1],))
+#soti
+#Dx = getClassifierLayers(inputs)
+#D = Model(inputs=[inputs], outputs=[Dx])
+D = Sequential()
+D = getClassifier(D, nInputs)
+#soti
 D.compile(loss="binary_crossentropy", optimizer="adam")
-#print "=== D model: summary"
-#D.summary()
+print "=== 2 D model: summary"
+D.summary()
 
 print "=== D model: Fit"
 D.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, verbose=1)
 
-y_predD = D.predict(X_test)
-for i in range(20):
-    print("Predicted=%s (%s) (%s)"% (target_test[i], y_predD[i], Y_test[i]))
 
 ###################################################
-#Pretraining
+# Define Models
 ###################################################
+'''
+# Classifier (characterizes events as signal or background)
+# Inputs: List of input variables
+# Output: classifier
+# Regressor: Predicts the top-quark mass from the classifiers output
+'''
 
 inputs = Input(shape=(X_train.shape[1],))
 
-Dx = Dense(32, activation="relu")(inputs)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(1, activation="sigmoid")(Dx)
-D = Model(inputs=[inputs], outputs=[Dx])
+#soti
+#Dx = getClassifierLayers(inputs)
+#D = Model(inputs=[inputs], outputs=[Dx])
+#Rx = getRegressorLayers(Dx, inputs)
+#R = Model(inputs=[inputs], outputs=[Rx])
+D = Sequential()
+D = getClassifier(D, nInputs)
+R = Sequential()
+R = getRegressor(D, R)
+#soti
 
-Rx = Dx
-Rx = Dense(16, activation="relu")(Rx)
-Rx = Dense(1, activation = "relu")(Rx)
-R = Model(inputs=[inputs], outputs=[Rx])
+print "=== 2 D model: summary"
+D.summary()
+print "=== 2 R model: summary"
+R.summary()
 
-#D.compile(loss=[make_loss_D(c=1.0)], optimizer="sgd")
 D.compile(loss="binary_crossentropy", optimizer="adam")
+
+print "=== 2 D model: summary"
+D.summary()
 
 ###################################################
 # Combined models
@@ -258,25 +355,32 @@ if opt.opt == "SGD":
     opt_DRf = SGD(momentum=0.0)
     opt_DfR = SGD(momentum=0.0)
 
+# Combined network: updates the classifier's weights
 DRf = Model(inputs=[inputs], outputs=[D(inputs), R(inputs)])
 make_trainable(R, False)
 make_trainable(D, True)
-DRf.compile(loss=[make_loss_D(c=1.0), make_loss_R(c=-lam)], optimizer=opt_DRf)
+# Compile combined model
+DRf.compile(loss=[getLoss_clf(c=1.0), getLoss_reg(c=-lam)], optimizer=opt_DRf)
 
-
+# Adversary network: predicts top-quark mass (classifier's layers are not trainable!)
 DfR = Model(inputs=[inputs], outputs=[R(inputs)])
 make_trainable(R, True)
 make_trainable(D, False)
-DfR.compile(loss=[make_loss_R(c=1.0)], optimizer=opt_DfR)
+DfR.compile(loss=[getLoss_reg(c=1.0)], optimizer=opt_DfR)
 
-# Pretraining of D
+###################################################
+# Pretrain Classifier
+###################################################
 make_trainable(R, False)
 make_trainable(D, True)
 
 print "=== D model: Fit"
 D.fit(X_train, Y_train, epochs=10)
 
-# Pretraining of R
+###################################################
+# Pretrain  Regressor
+# Here the output is the top-quark mass (target)
+###################################################
 make_trainable(R, True)
 make_trainable(D, False)
 
@@ -284,7 +388,7 @@ print "=== DfR model: Fit"
 DfR.fit(X_train, target_train, epochs=10)
 
 ###################################################
-# Adversarial Network
+# Train the model
 ###################################################
 
 losses = {"L_f": [], "L_r": [], "L_f - L_r": []}
@@ -295,27 +399,26 @@ for i in range(nepochs): #201
     l = DRf.evaluate(X_test, [Y_test, target_test], verbose=1)
     lf = l[1][None][0]
     lr = -l[2][None][0]
-    delta_lfr = l[0][None][0]
-    losses["L_f - L_r"].append(delta_lfr)
+    lfr = l[0][None][0]
+    losses["L_f - L_r"].append(lfr)
     losses["L_f"].append(lf)
     losses["L_r"].append(lr)
-    #print(losses["L_r"][-1] / lam)
-    #print lf, lr, delta_lfr
-    print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, delta_lfr)
+    print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, lfr)
     
-#    if i % 5 == 0:
-#        plot_losses(i, losses)
-
-    # Fit D
+    # Fit Classifier (with updated weights) to minimize joint loss function
     make_trainable(R, False)
     make_trainable(D, True)
     indices = numpy.random.permutation(len(X_train))[:batch_size]
     DRf.train_on_batch(X_train[indices], [Y_train[indices], target_train[indices]])
         
-    # Fit R
+    # Fit Regressor (with updated weights) to minimize Lr
     make_trainable(R, True)
     make_trainable(D, False)
     DfR.fit(X_train, target_train, batch_size=batch_size, epochs=1, verbose=0)
+
+###################################################
+# Test classifier's performance
+###################################################
 
 y_pred = D.predict(X_test)
 roc_auc_score(Y_test, y_pred)
@@ -323,14 +426,21 @@ roc_auc_score(Y_test, y_pred)
 for i in range(50):
     print("Predicted=%s (%s) (%s)"% (target_test[i], y_pred[i], Y_test[i]))
 
+###################################################
+# Plot Loss function vs # epoch
+###################################################
+
 saveDir = plot.getDirName("TopTag")
 PlotLossFunction(losses, nepochs, saveDir)
 
+###################################################
+# Classifier: save model
+###################################################
 
 # serialize weights to HDF5
 D.save_weights('modelANN_weights_lam%s.h5' % (opt.lam), overwrite=True)
 D.save("modelANN_lam%s.h5" % (opt.lam))
-# serialize model to JSON
+# serialize architecture to JSON
 model_json = D.to_json()
 with open("modelANN_architecture_lam%s.json" % (opt.lam), "w") as json_file:
     json_file.write(model_json)

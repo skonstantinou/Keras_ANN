@@ -120,9 +120,13 @@ def main():
     Models: modelANN_lamX.h5
     '''
 
-    lamValues = [0, 1, 5, 10, 50]
-    colors = [ROOT.kBlack, ROOT.kOrange, ROOT.kBlue, ROOT.kRed, ROOT.kGreen]
+    lamValues = [0, 1, 5, 10, 50]#, 100, 500]
+    colors = [ROOT.kBlack, ROOT.kOrange, ROOT.kBlue, ROOT.kRed, ROOT.kGreen, ROOT.kMagenta, ROOT.kOrange+7]
     canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas.SetLeftMargin(0.15)
+    canvas.SetTopMargin(0.06)
+    canvas.SetBottomMargin(0.13)
+
     canvas.cd()
     #canvas.SetLogy()
     
@@ -131,7 +135,8 @@ def main():
     histoList = []
     for lam in lamValues:
         print "Lambda = ", lam
-        loaded_model = load_model('models/modelANN_lam%s.h5' % (lam))
+        #loaded_model = load_model('models/modelANN_lam%s.h5' % (lam))
+        loaded_model = load_model('modelANN_lam%s.h5' % (lam))
         loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
         Y = loaded_model.predict(X, verbose=1)
         Ymass = numpy.concatenate((Y, target), axis=1)
@@ -139,7 +144,10 @@ def main():
         massSel = Ymass_sel[:, 1]        
 
         #Plot resutls
-        histo = ROOT.TH1F('histo_lam%s' %(lam), '', 500, 0, 1000)
+        nbins = 100
+        xmax  = 1000
+        width = float(xmax)/nbins
+        histo = ROOT.TH1F('histo_lam%s' %(lam), '', nbins, 0, xmax)
         mass_sel = []
         print "selected entries:", len(massSel)
         for mass in massSel:
@@ -156,13 +164,25 @@ def main():
     leg=plot.CreateLegend(0.6, 0.67, 0.9, 0.85)
     
     for i in range(len(histoList)):
-        leg.AddEntry(histoList[i], "t#bar{t} (#lambda = %s)" %(lamValues[i]) ,"f")
+        leg.AddEntry(histoList[i], "t#bar{t} (#lambda = %.0f)" %(lamValues[i]) ,"f")
         histoList[i].Scale(1./(histoList[i].Integral()))
         ymax = max(ymax, histoList[i].GetMaximum())
         histoList[i].Draw("HIST same")
-        histoList[i].GetXaxis().SetTitle("m_{top}")
-        histoList[i].GetYaxis().SetTitle("Entries")
+        histoList[i].GetXaxis().SetTitle("m_{top} (GeV)")
+        histoList[i].GetYaxis().SetTitle("Arbitrary Units / %.0f GeV" % (width))
+        histoList[i].GetXaxis().SetLabelSize(0.04)
+        histoList[i].GetXaxis().SetTitleSize(0.05)
+        histoList[i].GetXaxis().SetTitleOffset(1.)
+        histoList[i].GetXaxis().SetTitleFont(42)
+        histoList[i].GetYaxis().SetLabelSize(0.04)
+        histoList[i].GetYaxis().SetTitleSize(0.05)
+        histoList[i].GetYaxis().SetLabelFont(42)
+        histoList[i].GetYaxis().SetLabelOffset(0.007)
+        histoList[i].GetYaxis().SetTitleOffset(1.5)
+        histoList[i].GetYaxis().SetTitleFont(42)
 
+    for i in range(len(histoList)):
+        histoList[i].SetMaximum(ymax*1.1)
     leg.Draw("same")
     #tex1 = plot.TFtext("t#bar{t}",0.63,0.5)
     tex2 = plot.TFtext(" unmatched top candidates",0.85,0.5)
@@ -177,6 +197,7 @@ def main():
     graph.Draw("same")
     dirName = plot.getDirName("TopTag")
         
-    plot.SavePlot(canvas, dirName, "TopMassANN.pdf")
+    
+    plot.SavePlot(canvas, dirName, "TopMassANN_test.pdf")
     
 main()
