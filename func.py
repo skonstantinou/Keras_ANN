@@ -2,6 +2,7 @@ import ROOT
 import plot
 import math
 import array
+import json
 ###########################################################
 # Plot Output
 ###########################################################
@@ -291,3 +292,42 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     canvas.Close()
     return htrain_s1, htest_s1, htrain_b1, htest_b1
 
+
+###########################################################
+# Write model weights and architecture in txt file
+###########################################################
+
+def WriteModel(model, model_json, output):
+    arch = json.loads(model_json)
+    with open(output, 'w') as fout:
+        fout.write('layers ' + str(len(model.layers)) + '\n')
+        print "TYPE", type(arch)
+        layers = []
+        for ind, l in enumerate(arch["config"]):
+            fout.write('layer ' + str(ind) + ' ' + l['class_name'] + '\n')
+            layers += [l['class_name']]
+            if l['class_name'] == 'Convolution2D':
+
+                W = model.layers[ind].get_weights()[0]
+                fout.write(str(W.shape[0]) + ' ' + str(W.shape[1]) + ' ' + str(W.shape[2]) + ' ' + str(W.shape[3]) + ' ' + l['config']['border_mode'] + '\n')
+
+                for i in range(W.shape[0]):
+                    for j in range(W.shape[1]):
+                        for k in range(W.shape[2]):
+                            fout.write(str(W[i,j,k]) + '\n')
+                fout.write(str(model.layers[ind].get_weights()[1]) + '\n')
+
+            if l['class_name'] == 'Activation':
+                fout.write(l['config']['activation'] + '\n')
+            if l['class_name'] == 'MaxPooling2D':
+                fout.write(str(l['config']['pool_size'][0]) + ' ' + str(l['config']['pool_size'][1]) + '\n')
+            if l['class_name'] == 'Dense':
+                W = model.layers[ind].get_weights()[0]
+                fout.write(str(W.shape[0]) + ' ' + str(W.shape[1]) + '\n')
+
+                for w in W:
+                    fout.write(str(w) + '\n')
+                fout.write(str(model.layers[ind].get_weights()[1]) + '\n')
+
+        print 'Writing model in', output
+        return

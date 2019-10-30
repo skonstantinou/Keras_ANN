@@ -405,8 +405,12 @@ PlotLossFunction(losses, nepochs, saveDir)
 # serialize weights to HDF5
 model_clf.save_weights('modelANN_weights_lam%s.h5' % (opt.lam), overwrite=True)
 model_clf.save("modelANN_lam%s.h5" % (opt.lam))
+
 # serialize architecture to JSON
 model_json = model_clf.to_json()
 with open("modelANN_architecture_lam%s.json" % (opt.lam), "w") as json_file:
     json_file.write(model_json)
+
+# write weights and architecture in txt file
+func.WriteModel(model_clf, model_json, "modelANN_lam%s.txt" % (opt.lam))
 
