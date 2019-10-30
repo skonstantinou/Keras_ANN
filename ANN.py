@@ -25,6 +25,8 @@ import plot
 import func
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
+
+#Run in single CPU: this ensures reproducible results!
 config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
                         allow_soft_placement=True, device_count = {'CPU': 1})
 session = tf.Session(config=config)
@@ -163,12 +165,6 @@ def getRegressor(model_clf,model_reg):
 ###########################################################
 
 def getClassifierLayers(inputs):
-    '''
-    Dx = Dense(32, activation="relu")(inputs)
-    Dx = Dense(32, activation="relu")(Dx)
-    Dx = Dense(32, activation="relu")(Dx)
-    Dx = Dense(1, activation="sigmoid")(Dx)
-    '''
     Dx = Dense(32)(inputs)
     Dx = Activation("relu")(Dx)
     Dx = Dense(32)(Dx)
@@ -185,10 +181,6 @@ def getClassifierLayers(inputs):
 
 def getRegressorLayers(Dx, inputs):
     Rx = Dx
-    '''
-    Rx = Dense(16, activation="relu")(Rx)
-    Rx = Dense(1, activation = "relu")(Rx)
-    '''
     Rx = Dense(16)(Rx)
     Rx = Activation("relu")(Rx)
     Rx = Dense(1)(Rx)
@@ -288,27 +280,14 @@ X_train, X_test, Y_train, Y_test, target_train, target_test = train_test_split(
 ###################################################
 # Define classifier
 ###################################################
-'''
 inputs = Input(shape=(X_train.shape[1],))
-Dx = Dense(32, activation="relu")(inputs)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(1, activation="sigmoid")(Dx)
-D = Model(inputs=[inputs], outputs=[Dx])
-'''
-inputs = Input(shape=(X_train.shape[1],))
-#soti
-#Dx = getClassifierLayers(inputs)
-#D = Model(inputs=[inputs], outputs=[Dx])
-D = Sequential()
-D = getClassifier(D, nInputs)
-#soti
-D.compile(loss="binary_crossentropy", optimizer="adam")
-print "=== 2 D model: summary"
-D.summary()
+model_clf = Sequential()
+model_clf = getClassifier(model_clf, nInputs)
 
-print "=== D model: Fit"
-D.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, verbose=1)
+model_clf.compile(loss="binary_crossentropy", optimizer="adam")
+
+print "=== Classifier: Fit"
+model_clf.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, verbose=1)
 
 
 ###################################################
@@ -323,69 +302,55 @@ D.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10, verbose=1)
 
 inputs = Input(shape=(X_train.shape[1],))
 
-#soti
-#Dx = getClassifierLayers(inputs)
-#D = Model(inputs=[inputs], outputs=[Dx])
-#Rx = getRegressorLayers(Dx, inputs)
-#R = Model(inputs=[inputs], outputs=[Rx])
-D = Sequential()
-D = getClassifier(D, nInputs)
-R = Sequential()
-R = getRegressor(D, R)
-#soti
+model_clf = Sequential()
+model_clf = getClassifier(model_clf, nInputs)
+model_reg = Sequential()
+model_reg = getRegressor(model_clf, model_reg)
 
-print "=== 2 D model: summary"
-D.summary()
-print "=== 2 R model: summary"
-R.summary()
-
-D.compile(loss="binary_crossentropy", optimizer="adam")
-
-print "=== 2 D model: summary"
-D.summary()
+model_clf.compile(loss="binary_crossentropy", optimizer="adam")
 
 ###################################################
 # Combined models
 ###################################################
 
-opt_DRf = opt.opt
-opt_DfR = opt.opt
+opt_comb = opt.opt
+opt_adv = opt.opt
 
 if opt.opt == "SGD":    
-    opt_DRf = SGD(momentum=0.0)
-    opt_DfR = SGD(momentum=0.0)
+    opt_comb = SGD(momentum=0.0)
+    opt_adv = SGD(momentum=0.0)
 
 # Combined network: updates the classifier's weights
-DRf = Model(inputs=[inputs], outputs=[D(inputs), R(inputs)])
-make_trainable(R, False)
-make_trainable(D, True)
+model_comb = Model(inputs=[inputs], outputs=[model_clf(inputs), model_reg(inputs)])
+make_trainable(model_reg, False)
+make_trainable(model_clf, True)
 # Compile combined model
-DRf.compile(loss=[getLoss_clf(c=1.0), getLoss_reg(c=-lam)], optimizer=opt_DRf)
+model_comb.compile(loss=[getLoss_clf(c=1.0), getLoss_reg(c=-lam)], optimizer=opt_comb)
 
 # Adversary network: predicts top-quark mass (classifier's layers are not trainable!)
-DfR = Model(inputs=[inputs], outputs=[R(inputs)])
-make_trainable(R, True)
-make_trainable(D, False)
-DfR.compile(loss=[getLoss_reg(c=1.0)], optimizer=opt_DfR)
+model_adv = Model(inputs=[inputs], outputs=[model_reg(inputs)])
+make_trainable(model_reg, True)
+make_trainable(model_clf, False)
+model_adv.compile(loss=[getLoss_reg(c=1.0)], optimizer=opt_adv)
 
 ###################################################
 # Pretrain Classifier
 ###################################################
-make_trainable(R, False)
-make_trainable(D, True)
+make_trainable(model_reg, False)
+make_trainable(model_clf, True)
 
-print "=== D model: Fit"
-D.fit(X_train, Y_train, epochs=10)
+print "=== Classifier: Fit"
+model_clf.fit(X_train, Y_train, epochs=10)
 
 ###################################################
 # Pretrain  Regressor
 # Here the output is the top-quark mass (target)
 ###################################################
-make_trainable(R, True)
-make_trainable(D, False)
+make_trainable(model_reg, True)
+make_trainable(model_clf, False)
 
-print "=== DfR model: Fit"
-DfR.fit(X_train, target_train, epochs=10)
+print "=== Adversarial Network: Fit"
+model_adv.fit(X_train, target_train, epochs=10)
 
 ###################################################
 # Train the model
@@ -396,7 +361,7 @@ losses = {"L_f": [], "L_r": [], "L_f - L_r": []}
 batch_size = 128
 
 for i in range(nepochs): #201
-    l = DRf.evaluate(X_test, [Y_test, target_test], verbose=1)
+    l = model_comb.evaluate(X_test, [Y_test, target_test], verbose=1)
     lf = l[1][None][0]
     lr = -l[2][None][0]
     lfr = l[0][None][0]
@@ -406,21 +371,21 @@ for i in range(nepochs): #201
     print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, lfr)
     
     # Fit Classifier (with updated weights) to minimize joint loss function
-    make_trainable(R, False)
-    make_trainable(D, True)
+    make_trainable(model_reg, False)
+    make_trainable(model_clf, True)
     indices = numpy.random.permutation(len(X_train))[:batch_size]
-    DRf.train_on_batch(X_train[indices], [Y_train[indices], target_train[indices]])
+    model_comb.train_on_batch(X_train[indices], [Y_train[indices], target_train[indices]])
         
     # Fit Regressor (with updated weights) to minimize Lr
-    make_trainable(R, True)
-    make_trainable(D, False)
-    DfR.fit(X_train, target_train, batch_size=batch_size, epochs=1, verbose=0)
+    make_trainable(model_reg, True)
+    make_trainable(model_clf, False)
+    model_adv.fit(X_train, target_train, batch_size=batch_size, epochs=1, verbose=0)
 
 ###################################################
 # Test classifier's performance
 ###################################################
 
-y_pred = D.predict(X_test)
+y_pred = model_clf.predict(X_test)
 roc_auc_score(Y_test, y_pred)
 
 for i in range(50):
@@ -438,10 +403,10 @@ PlotLossFunction(losses, nepochs, saveDir)
 ###################################################
 
 # serialize weights to HDF5
-D.save_weights('modelANN_weights_lam%s.h5' % (opt.lam), overwrite=True)
-D.save("modelANN_lam%s.h5" % (opt.lam))
+model_clf.save_weights('modelANN_weights_lam%s.h5' % (opt.lam), overwrite=True)
+model_clf.save("modelANN_lam%s.h5" % (opt.lam))
 # serialize architecture to JSON
-model_json = D.to_json()
+model_json = model_clf.to_json()
 with open("modelANN_architecture_lam%s.json" % (opt.lam), "w") as json_file:
     json_file.write(model_json)
 
