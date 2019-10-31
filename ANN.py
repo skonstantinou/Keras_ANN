@@ -35,7 +35,7 @@ K.set_session(session)
 #Default values:
 LAMBDA = 1
 NEPOCHS = 200
-OPTIMIZER = "Adam"
+OPTIMIZER = "SGD"
 LR = 0.01 # Default value for SGD
 helpText = "* lambda: Penalty factor for loss function. Describes the mass dependence."
 from optparse import OptionParser
