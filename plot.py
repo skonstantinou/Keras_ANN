@@ -1,6 +1,15 @@
 import ROOT
 import array
 import os
+import getpass
+
+def CreateCanvas():
+    canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas.SetLeftMargin(0.12)
+    canvas.SetRightMargin(0.12)
+    canvas.SetTopMargin(0.06)
+    canvas.SetBottomMargin(0.13)
+    return canvas
 
 def CreateLegend(xmin=0.55, ymin=0.75, xmax=0.85, ymax=0.85):
     leg = ROOT.TLegend(xmin, ymin, xmax, ymax)
@@ -48,8 +57,10 @@ def GetRatioStyle(h_ratio, ytitle, xtitle, ymax=2, ymin=0):
     return h_ratio
 
 def getDirName(dirName):
+    usrName = getpass.getuser() 
+    usrInit = usrName[0]
     dirName = dirName.replace(".", "p")
-    dirName = "/afs/cern.ch/user/s/skonstan/public/html/"+dirName
+    dirName = "/afs/cern.ch/user/%s/%s/public/html/%s" % (usrInit, usrName, dirName)
     return dirName
 
 def SavePlot(canvas, saveDir, saveName):
@@ -59,10 +70,12 @@ def SavePlot(canvas, saveDir, saveName):
         os.mkdir(saveDir)
         print "Directory " , saveDir ,  " has been created "
     else:
-        print "Output saved under", saveDir
-
+        if 0:
+            print "Output saved under", saveDir
+            
     savePath = "%s/%s" % (saveDir, saveName)
-    saveURL  = savePath.replace("/afs/cern.ch/user/s/","https://cmsdoc.cern.ch/~")
+    usrInit =  getpass.getuser()[0]
+    saveURL  = savePath.replace("/afs/cern.ch/user/%s/" %(usrInit),"https://cmsdoc.cern.ch/~")
     saveURL  = saveURL.replace("/public/html/","/")
     canvas.SaveAs(savePath)
     savePath = savePath.replace("pdf","root")
@@ -70,37 +83,28 @@ def SavePlot(canvas, saveDir, saveName):
     print "=== ", saveURL
     return
 
-def GetLegendStyle(histoName):
-    if "test" in histoName:
-        legStyle = "f"
-        if "_s" in histoName:
-            legText = "signal (test)"
-        else:
-            legText = "background (test)"
-    elif "train" in histoName:
-        legStyle = "p"
-        if "_s" in histoName:
-            legText = "signal (train)"
-        else:
-            legText = "signal (test)"
-    return legText, legStyle
-
-def ApplyStyle(histo):
-    if "_s" in histo.GetName():
-        color = ROOT.kBlue
-    else:
-        color = ROOT.kRed
-
-    histo.SetMarkerColor(color)
-    histo.SetLineColor(color)
-    histo.SetLineWidth(2)
-    histo.SetMarkerStyle(8)
-    histo.SetMarkerSize(0.8)
+def ApplyStyle(h, color):
+    h.SetLineColor(color)
+    h.SetMarkerColor(color)
+    h.SetMarkerStyle(8)
+    h.SetMarkerSize(0.5)
+    h.SetLineWidth(3)
+    h.SetMinimum(0)
+    
+    h.GetXaxis().SetTitle("Output")
+    h.GetXaxis().SetLabelSize(0.045)
+    h.GetXaxis().SetTitleSize(0.05)
+    h.GetXaxis().SetTitleOffset(1.)
+    h.GetXaxis().SetTitleFont(42)
+    
+    h.GetYaxis().SetTitle("Efficiency")
+    h.GetYaxis().SetLabelSize(0.045)
+    h.GetYaxis().SetTitleSize(0.05)
+    h.GetYaxis().SetLabelFont(42)
+    h.GetYaxis().SetLabelOffset(0.007)
+    h.GetYaxis().SetTitleOffset(1.2)
+    h.GetYaxis().SetTitleFont(42)
+    
+    h.SetTitle("")
     return
 
-def DrawStyle(histoName):
-    if "train" in histoName:
-        _style = "P"
-    else:
-        _style = "HIST"
-    return _style
