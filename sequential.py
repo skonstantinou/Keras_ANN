@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 '''
 DESCRIPTION:
-
+This script provides an interface for conducting deep learning studies in python
+with Keras. The step included are:
+1. Load Data.
+2. Define Keras Model.
+3. Compile Keras Model.
+4. Fit Keras Model.
+5. Evaluate Keras Model.
+6. Tie It All Together.
+7. Make Predictions
 
 
 USAGE:
@@ -9,11 +17,11 @@ USAGE:
 
 
 EXAMPLES:
-./sequential.py
+./sequential.py --test --activation relu -s png,pdf,root,C
 
 
 LAST USED:
-./sequential.py --test --activation relu
+./sequential.py --test --activation relu -s pdf
 
 
 GITHUB:
@@ -32,6 +40,7 @@ uproot: https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281
 #================================================================================================ 
 # Imports
 #================================================================================================ 
+print "=== Importing KERAS"
 import keras
 import uproot
 import numpy
@@ -195,9 +204,11 @@ def main(opts):
     dset_background = df_background.values
     dset_all        = df_all.values
 
-    # Define keras model as a linear stack of layers. 
+    # Define keras model as a linear stack of layers. Add layers one at a time until we are happy with our network architecture.
     Print("Creating the sequential model", True)
     model = Sequential()
+
+    # The best network structure is found through a process of trial and error experimentation. Generally, you need a network large enough to capture the structure of the problem.
     layer1_neurons  = 36
     layer2_neurons  = nInputs
     layerN_neurons  = 1
@@ -217,8 +228,8 @@ def main(opts):
     Print("Creating %soutput layer%s of model (# neurons = %d , activation=\"%s\")" % (ts, ns, layerN_neurons, layerN_activate), False)
     model.add( Dense(1, activation = 'sigmoid') )
 
-
     # Print out model summary
+    Print("Printing model summary:", True)
     model.summary()
     
     # Split data into input (X) and output (Y). (Note: dataset includes both signal and background sequentially)
@@ -239,25 +250,19 @@ def main(opts):
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
     # Optimizer function is related to a function used to optimise the weights
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc']) 
-
-    # Define the model name before training. Not needed
-    if 0:
-        modelName = "Model_%s.h5" % (opts.rootFileName.replace(".root",""))
-        model.save(modelName)
     
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one pass over the entire dataset", 
     # used to separate training into distinct phases, which is useful for logging and periodic evaluation.)
-    hist = model.fit(
-        X_train,
-        Y_train,
-        validation_data=(X_test, Y_test),
-        epochs     = opts.epochs,   # one pass over the entire dataset
-        batch_size = opts.batches,  # a set of N samples
-        shuffle    = False,         # 
-        verbose    = 2,             # 0=silent, 1=progress, 2=mention the number of epoch
-        callbacks  = callbacks_list #
-    )
+    hist = model.fit(X_train,
+                     Y_train,
+                     validation_data=(X_test, Y_test),
+                     epochs     = opts.epochs,   # one pass over the entire dataset
+                     batch_size = opts.batches,  # a set of N samples
+                     shuffle    = False,         # 
+                     verbose    = 1,             # 0=silent, 1=progress, 2=mention the number of epoch
+                     callbacks  = callbacks_list #
+                 )
 
     if not opts.test:
         modelName = "Model_%s_trained.h5" % (opts.rootFileName.replace(".root",""))
@@ -272,39 +277,46 @@ def main(opts):
         model.save_weights('model_weights.h5', overwrite=True)
         model.save(modelName)
 
-    # Produce method score (i.e. predict output value for given input dataset)
-    pred_train      = model.predict(X_train)
-    pred_test       = model.predict(X_test)
-    pred_signal     = model.predict(X_signal)
-    pred_background = model.predict(X_background)
+    # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
+    Print("Generating output predictions for the input samples (e.g. Numpy array)", True)
+    pred_train      = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
+    pred_test       = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
+    pred_signal     = model.predict(X_signal    , batch_size=None, verbose=1, steps=None)
+    pred_background = model.predict(X_background, batch_size=None, verbose=1, steps=None)
+    # Keras version 2.2.5 or later (https://keras.io/models/model/)
+    # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
-    # Merge X and Y trains (add the ouput variable to the input variables)
-    XY_train     = numpy.concatenate((X_train, Y_train), axis=1)
-    XY_test      = numpy.concatenate((X_test , Y_test ), axis=1)
+    # Join a sequence of arrays (X and Y) along an existing axis (1). In other words, add the ouput variable (Y) to the input variables (X)
+    XY_train = numpy.concatenate((X_train, Y_train), axis=1)
+    XY_test  = numpy.concatenate((X_test , Y_test ), axis=1)
 
     # Pick events with output = 1
-    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs]
-    x_train_B = XY_train[XY_train[:,nInputs] == 0]; x_train_B = x_train_B[:,0:nInputs]
+    Print("Select events/samples which have an output variable Y (last column) equal to 1 (i.e. prediction is combatible with signal)", True)
+    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs] #iro - fixme - understand
     x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
+
+    Print("Select events/samples which have an output variable Y (last column) equal to 0 (i.e. prediction is NOT combatible with signal)", True)
+    x_train_B = XY_train[XY_train[:,nInputs] == 0]; x_train_B = x_train_B[:,0:nInputs]
     x_test_B  = XY_test[XY_test[:,nInputs] == 0];   x_test_B  = x_test_B[:,0:nInputs]
     
     # Produce method score for signal (training and test) and background (training and test)
-    pred_train_S =  model.predict(x_train_S)
-    pred_train_B =  model.predict(x_train_B)
-    pred_test_S  =  model.predict(x_test_S)
-    pred_test_B  =  model.predict(x_test_B)
-
-    dirName = plot.getDirName("Keras")
+    pred_train_S =  model.predict(x_train_S, batch_size=None, verbose=1, steps=None)
+    pred_train_B =  model.predict(x_train_B, batch_size=None, verbose=1, steps=None)
+    pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
+    pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
+    # Keras version 2.2.5 or later (https://keras.io/models/model/)
+    # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
     # Plot some output
-    func.PlotOutput(pred_signal , pred_background, dirName, "Output_SB.pdf", 1)
-    func.PlotOutput(pred_train  , pred_test      , dirName, "Output_pred.pdf", 0)
-    func.PlotOutput(pred_train_S, pred_train_B   , dirName, "Output_SB_train.pdf", 1)
-    func.PlotOutput(pred_test_S , pred_test_B    , dirName, "Output_SB_test.pdf", 1)
+    dirName = plot.getDirName("Keras") # fixme - replace with opts.saveDir
+    func.PlotOutput(pred_signal , pred_background, dirName, "Output_SB"      , 1, opts.saveFormats)
+    func.PlotOutput(pred_train  , pred_test      , dirName, "Output_pred"    , 0, opts.saveFormats)
+    func.PlotOutput(pred_train_S, pred_train_B   , dirName, "Output_SB_train", 1, opts.saveFormats)
+    func.PlotOutput(pred_test_S , pred_test_B    , dirName, "Output_SB_test" , 1, opts.saveFormats)
     
     # Calculate efficiency (Entries Vs Output)
-    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest.pdf")
-    func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf")
+    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest", opts.saveFormats)
+    func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency", opts.saveFormats)
     
     return 
 
@@ -408,9 +420,12 @@ if __name__ == "__main__":
         opts.saveFormats = opts.saveFormats.split(",")
     else:
         opts.saveFormats = [opts.saveFormats]
-    opts.saveFormats = ["." + s for s in opts.saveFormats]
+    #opts.saveFormats = ["." + s for s in opts.saveFormats]
+    opts.saveFormats = [s for s in opts.saveFormats]
+    Print("Will save all output in %d formats: %s" % (len(opts.saveFormats), ss + ", ".join(opts.saveFormats) + ns), True)
 
     # Call the main function
+    Print("Using Keras %s" % (ss + keras.__version__ + ns), True)
     main(opts)
 
     if opts.notBatchMode:

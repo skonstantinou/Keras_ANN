@@ -24,6 +24,11 @@ from sklearn.metrics import roc_auc_score
 import plot
 import func
 
+# Do not display canvases
+ROOT.gROOT.SetBatch(ROOT.kTRUE)
+# Disable screen output info
+ROOT.gROOT.ProcessLine( "gErrorIgnoreLevel = 1001;")
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 
 #Run in single CPU: this ensures reproducible results!
