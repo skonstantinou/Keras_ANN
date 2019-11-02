@@ -4,11 +4,7 @@ import os
 import getpass
 
 def CreateCanvas():
-    canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
-    canvas.SetLeftMargin(0.12)
-    canvas.SetRightMargin(0.12)
-    canvas.SetTopMargin(0.06)
-    canvas.SetBottomMargin(0.13)
+    canvas = ROOT.TCanvas()
     return canvas
 
 def CreateLegend(xmin=0.55, ymin=0.75, xmax=0.85, ymax=0.85):
@@ -16,14 +12,20 @@ def CreateLegend(xmin=0.55, ymin=0.75, xmax=0.85, ymax=0.85):
     leg.SetFillStyle(0)
     leg.SetBorderSize(0)
     leg.SetTextSize(0.040)
+    leg.SetTextFont(42)
+    #leg.SetTextSize(0.09)
+    leg.SetLineColor(1)
+    leg.SetLineStyle(1)
+    leg.SetLineWidth(1)
+    leg.SetFillColor(0)
     return leg
 
-def TFtext(tftext, x=0.3, y=0.8):
-    tex = ROOT.TLatex(x, y, tftext)
+def Text(text, x=0.3, y=0.8):
+    tex = ROOT.TLatex(x, y, text)
     tex.SetNDC()
     tex.SetTextAlign(31)
     tex.SetTextFont(42)
-    tex.SetTextSize(0.040)
+    tex.SetTextSize(0.030)
     tex.SetLineWidth(2)
     return tex
 
@@ -82,31 +84,15 @@ def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"]):
     for ext in saveFormats:
         fileName = "%s.%s" % (savePath, ext)
         canvas.SaveAs( fileName )
-    print "=== ", saveURL
+        print "=== ","%s.%s" % (saveURL, ext)
     return
 
 def ApplyStyle(h, color):
     h.SetLineColor(color)
     h.SetMarkerColor(color)
     h.SetMarkerStyle(8)
-    h.SetMarkerSize(0.5)
+    h.SetMarkerSize(0.3)
     h.SetLineWidth(3)
-    h.SetMinimum(0)
-    
-    h.GetXaxis().SetTitle("Output")
-    h.GetXaxis().SetLabelSize(0.045)
-    h.GetXaxis().SetTitleSize(0.05)
-    h.GetXaxis().SetTitleOffset(1.)
-    h.GetXaxis().SetTitleFont(42)
-    
-    h.GetYaxis().SetTitle("Efficiency")
-    h.GetYaxis().SetLabelSize(0.045)
-    h.GetYaxis().SetTitleSize(0.05)
-    h.GetYaxis().SetLabelFont(42)
-    h.GetYaxis().SetLabelOffset(0.007)
-    h.GetYaxis().SetTitleOffset(1.2)
-    h.GetYaxis().SetTitleFont(42)
-    
     h.SetTitle("")
     return
 
