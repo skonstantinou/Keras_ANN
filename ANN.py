@@ -23,6 +23,7 @@ from sklearn.metrics import roc_auc_score
 
 import plot
 import func
+import tdrstyle
 
 # Do not display canvases
 ROOT.gROOT.SetBatch(ROOT.kTRUE)
@@ -38,9 +39,12 @@ session = tf.Session(config=config)
 K.set_session(session)
 
 #Default values:
-LAMBDA = 1
-NEPOCHS = 200
-OPTIMIZER = "SGD"
+LAMBDA       = 1
+NEPOCHS      = 200
+OPTIMIZER    = "SGD"
+GRIDX        = False
+GRIDY        = False
+
 LR = 0.01 # Default value for SGD
 helpText = "* lambda: Penalty factor for loss function. Describes the mass dependence."
 from optparse import OptionParser
@@ -50,8 +54,15 @@ parser.add_option("--lr",dest="lr",  default=LR,  type = float,   help="Learning
 parser.add_option("--opt",dest="opt",  default=OPTIMIZER,   help="Optimizer (Default: %s)" % OPTIMIZER)
 parser.add_option("--lam",dest="lam",  default=LAMBDA,  type = int,   help="Lambda (Default: %s)" % LAMBDA)
 parser.add_option("--nepochs", dest="nepochs", default = NEPOCHS, type = int, help ="Number of epochs (Default: %s)" % NEPOCHS)
+parser.add_option("--gridX", dest="gridX", action="store_true", default=GRIDX, help="Enable the x-axis grid lines [default: %s]" % GRIDX)
+parser.add_option("--gridY", dest="gridY", action="store_true", default=GRIDY, help="Enable the y-axis grid lines [default: %s]" % GRIDY)
+
 opt, args = parser.parse_args()
 
+style = tdrstyle.TDRStyle() 
+style.setOptStat(False) 
+style.setGridX(opt.gridX)
+style.setGridY(opt.gridY)
 
 ###########################################################
 # Plot Loss Function

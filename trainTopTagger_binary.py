@@ -16,11 +16,24 @@ from keras.layers import Dense, Activation, Flatten
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.externals import joblib
+import keras.backend as K
 
 import plot
 import func
+import tdrstyle
+
+# Do not display canvases
+ROOT.gROOT.SetBatch(ROOT.kTRUE)
+# Disable screen output info
+ROOT.gROOT.ProcessLine( "gErrorIgnoreLevel = 1001;")
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
+
+#Run in single CPU: this ensures reproducible results!
+config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
+                        allow_soft_placement=True, device_count = {'CPU': 1})
+session = tf.Session(config=config)
+K.set_session(session)
 
 #Main
 # Definitions
@@ -31,9 +44,15 @@ seed     = 1234
 nepochs  = 5000
 nbatch   = 500
 
-if 0:
+if 1:
     nepochs = 10
     nbatch = 5000
+
+style = tdrstyle.TDRStyle() 
+style.setOptStat(False) 
+style.setGridX(False)
+style.setGridY(False)
+
 
 # Setting the seed for numpy-generated random numbers
 numpy.random.seed(seed)
@@ -173,14 +192,17 @@ dirName = plot.getDirName("TopTag")
 X_signal     = dset_signal[:nsignal, 0:nInputs]
 X_background = dset_background[:nsignal, 0:nInputs]
 
-func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB.pdf", 1)
-func.PlotOutput(pred_train, pred_test, dirName, "Output_pred.pdf", 0)
-func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train.pdf", 1)
-func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test.pdf", 1)
+func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB.pdf", 1, "pdf")
+func.PlotOutput(pred_train, pred_test, dirName, "Output_pred.pdf", 0, "pdf")
+func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train.pdf", 1, "pdf")
+func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test.pdf", 1, "pdf")
 
 # Calculate efficiency
-htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest.pdf")
-func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf")
+htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest.pdf", "pdf")
+func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf", "pdf")
 
+graph1 = func.GetROC(htest_s, htest_b)
+graph2 = func.GetROC(htest_b, htest_s)
 
-
+graph_roc = {"graph" : [graph1, graph2], "name" : ["graph 1", "graph 2"]}
+func.PlotROC(graph_roc, dirName, "ROC.pdf", "pdf")

@@ -60,6 +60,7 @@ from sklearn.externals import joblib
 
 import plot
 import func
+import tdrstyle
 
 import sys
 import datetime 
@@ -107,6 +108,11 @@ def main(opts):
 
     # Disable screen output info
     ROOT.gROOT.ProcessLine( "gErrorIgnoreLevel = 1001;")
+
+    style = tdrstyle.TDRStyle() 
+    style.setOptStat(False) 
+    style.setGridX(opts.gridX)
+    style.setGridY(opts.gridY)
 
     # Open the ROOT file
     ROOT.TFile.Open(opts.rootFileName)
@@ -343,6 +349,8 @@ if __name__ == "__main__":
     # Default Settings
     ROOTFILENAME = "histograms-TT_19var.root"
     NOTBATCHMODE = False
+    GRIDX        = False
+    GRIDY        = False
     SAVEDIR      = None
     SAVEFORMATS  = "png"
     URL          = False
@@ -388,6 +396,11 @@ if __name__ == "__main__":
 
     parser.add_option("--activation", dest="activation", type="string", default=ACTIVATION,
                       help=" Type of transfer function that will be used to map the output of one layer to another [default: %s]" % ACTIVATION)
+    parser.add_option("--gridX", dest="gridX", action="store_true", default=GRIDX, 
+                      help="Enable the x-axis grid lines [default: %s]" % GRIDX)
+
+    parser.add_option("--gridY", dest="gridY", action="store_true", default=GRIDY, 
+                      help="Enable the y-axis grid lines [default: %s]" % GRIDY)
 
     (opts, parseArgs) = parser.parse_args()
 
