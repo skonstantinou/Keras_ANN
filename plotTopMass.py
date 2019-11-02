@@ -26,15 +26,21 @@ from keras.models import model_from_json
 #from rootpy.root2array import fill_hist_with_ndarray
 
 import plot
+import tdrstyle
+import func
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 
 
 def main():
     ROOT.gStyle.SetOptStat(0)
-    # Definitions
 
-    #filename  = "TopRecoTree_QCD/QCD_HT200to300_ext1/res/histograms-QCD_HT200to300_ext1.root"
+    style = tdrstyle.TDRStyle() 
+    style.setOptStat(False) 
+    style.setGridX(False)
+    style.setGridY(False)
+
+    # Definitions
     filename  = "histograms-TT_19var.root"
     debug   = 1
     nprint  = 100
@@ -43,8 +49,6 @@ def main():
     #Signal and background branches
     signal     = uproot.open(filename)["treeS"]
     background = uproot.open(filename)["treeB"]
-    #signal     = tfile.Get("treeS")
-    #background = tfile.Get("treeB")
     
     # Input list
     inputList = []
@@ -70,26 +74,11 @@ def main():
     
     nInputs = len(inputList)
     
-    '''
-    ###########################################################
-    # Activate interesting branches (Speed things up !)
-    ###########################################################
-    print "Activate interesting branches (Speed things up !)"
-    signal.SetBranchStatus("*",0) 
-    background.SetBranchStatus("*",0) 
-    for inp in inputList:        
-        signal.SetBranchStatus(inp,1)
-        background.SetBranchStatus(inp,1)
-    signal.SetBranchStatus("TrijetMass", 1)
-    background.SetBranchStatus("TrijetMass", 1)
-    ###########################################################
-    '''
     #Signal and background dataframes
-    df_signal     = signal.pandas.df(inputList)#.assign(signal=1)
-    df_background = background.pandas.df(inputList)#.assign(signal=0)
+    df_signal     = signal.pandas.df(inputList)
+    df_background = background.pandas.df(inputList)
 
     nEvts = len(df_background.index)/10
-    #nEvts = len(df_signal.index)
     print "=== Number of signal events: ", nEvts
     
     #Signal and background datasets
@@ -108,38 +97,27 @@ def main():
     X_background = dset_background[:nEvts, 0:nInputs]
 
     nEvts = nEvts
-    #X            = dataset[:nEvts, 0:nInputs]
-    #target       = dataset_target_all[:nEvts, :] 
     X = dset_background[:nEvts, 0:nInputs]
     target = dataset_target_bkg[:nEvts, :]
-    #X = dset_signal[:nEvts, 0:nInputs]
-    #target = dataset_target_signal[:nEvts, :]
-    #Load model
 
-    '''
-    Models: modelANN_lamX.h5
-    '''
-
-    lamValues = [0, 1, 5, 10, 50]#, 100, 500]
+    #Load models
+    lamValues = [1, 5, 10, 50] # fixme! should be given as option
     colors = [ROOT.kBlack, ROOT.kOrange, ROOT.kBlue, ROOT.kRed, ROOT.kGreen, ROOT.kMagenta, ROOT.kOrange+7]
-    canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
-    canvas.SetLeftMargin(0.15)
-    canvas.SetTopMargin(0.06)
-    canvas.SetBottomMargin(0.13)
-
+    canvas = plot.CreateCanvas()
     canvas.cd()
     #canvas.SetLogy()
     
-    icol=-1
     ymax = 0
     histoList = []
     for lam in lamValues:
         print "Lambda = ", lam
-        #loaded_model = load_model('models/modelANN_lam%s.h5' % (lam))
-        loaded_model = load_model('modelANN_lam%s.h5' % (lam))
+        loaded_model = load_model('models_30Oct/modelANN_lam%s.h5' % (lam))
+        #loaded_model = load_model('modelANN_lam%s.h5' % (lam))
         loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
         Y = loaded_model.predict(X, verbose=1)
         Ymass = numpy.concatenate((Y, target), axis=1)
+
+        # Get selected top candidates
         Ymass_sel = Ymass[Ymass[:,0] >= 0.5]
         massSel = Ymass_sel[:, 1]        
 
@@ -154,8 +132,6 @@ def main():
             #print "test: %s / %s: m = %s" % (i, len(massSel), mass)
             histo.Fill(mass)
 
-        icol+=1
-        histo.SetLineColor(colors[icol])
         histoList.append(histo.Clone("histoClone_lam%s" % lam))
         
         #histo.Delete()
@@ -165,39 +141,24 @@ def main():
     
     for i in range(len(histoList)):
         leg.AddEntry(histoList[i], "t#bar{t} (#lambda = %.0f)" %(lamValues[i]) ,"f")
+        print "=== Lambda =  %.0f" % lamValues[i]
         histoList[i].Scale(1./(histoList[i].Integral()))
         ymax = max(ymax, histoList[i].GetMaximum())
-        histoList[i].Draw("HIST same")
         histoList[i].GetXaxis().SetTitle("m_{top} (GeV)")
         histoList[i].GetYaxis().SetTitle("Arbitrary Units / %.0f GeV" % (width))
-        histoList[i].GetXaxis().SetLabelSize(0.04)
-        histoList[i].GetXaxis().SetTitleSize(0.05)
-        histoList[i].GetXaxis().SetTitleOffset(1.)
-        histoList[i].GetXaxis().SetTitleFont(42)
-        histoList[i].GetYaxis().SetLabelSize(0.04)
-        histoList[i].GetYaxis().SetTitleSize(0.05)
-        histoList[i].GetYaxis().SetLabelFont(42)
-        histoList[i].GetYaxis().SetLabelOffset(0.007)
-        histoList[i].GetYaxis().SetTitleOffset(1.5)
-        histoList[i].GetYaxis().SetTitleFont(42)
-
+        plot.ApplyStyle(histoList[i], colors[i])
+        histoList[i].Draw("HIST same")
     for i in range(len(histoList)):
         histoList[i].SetMaximum(ymax*1.1)
     leg.Draw("same")
-    #tex1 = plot.TFtext("t#bar{t}",0.63,0.5)
-    tex2 = plot.TFtext(" unmatched top candidates",0.85,0.5)
-    tex3 = plot.TFtext(" with output value > 0.50",0.82,0.45)
-    #tex1.SetTextSize(0.045)
-    tex2.SetTextSize(0.030)
-    tex3.SetTextSize(0.030)
-    #tex1.Draw()
+    tex1 = plot.Text(" unmatched top candidates",0.85,0.5)
+    tex2 = plot.Text(" with output value > 0.50",0.82,0.45)
+    tex1.Draw()
     tex2.Draw()
-    tex3.Draw()
     graph = plot.CreateGraph([173., 173.], [0, ymax*1.1])
     graph.Draw("same")
     dirName = plot.getDirName("TopTag")
-        
-    
-    plot.SavePlot(canvas, dirName, "TopMassANN_test.pdf")
+            
+    plot.SavePlot(canvas, dirName, "TopMassANN")
     
 main()
