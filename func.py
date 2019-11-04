@@ -3,13 +3,15 @@ import plot
 import math
 import array
 import json
+
 ###########################################################
 # Plot Output
 ###########################################################
 
 def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
+    
     ROOT.gStyle.SetOptStat(0)
-    canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas = plot.CreateCanvas()
     canvas.cd()
     canvas.SetLogy()
     h1=ROOT.TH1F('train', '', 50, 0.0, 1.)
@@ -23,20 +25,21 @@ def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
     if 0:
         h1.Scale(1./h1.Integral())
         h2.Scale(1./h2.Integral())
+
     ymax = max(h1.GetMaximum(), h2.GetMaximum())
 
-    h1.SetLineColor(ROOT.kRed)
-    h1.SetMaximum(ymax*1.1)
-    h1.GetXaxis().SetTitle("Output")
-    h1.Draw("HIST")
+    plot.ApplyStyle(h1, ROOT.kMagenta+1)
+    plot.ApplyStyle(h2, ROOT.kGreen+2)
 
-    h2.SetLineColor(ROOT.kGreen)
-    h2.SetMaximum(ymax*1.1)
-    h2.GetXaxis().SetTitle("Output")
-    h2.Draw("HIST SAME")
+    for h in [h1,h2]:
+        h.SetMinimum(100)
+        h.SetMaximum(ymax*1.1)
+        h.GetXaxis().SetTitle("Output")
+        h.GetYaxis().SetTitle("Entries")
+        h.Draw("HIST SAME")
 
-    graph = plot.CreateGraph([0, 0], [0, ymax*1.1])
-    #graph.Draw("same")
+    graph = plot.CreateGraph([0.5, 0.5], [0, ymax*1.1])
+    graph.Draw("same")
     
     leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
     if isSB:
@@ -114,6 +117,8 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     ROOT.gStyle.SetOptStat(0)
     canvas = plot.CreateCanvas()
     canvas.cd()
+    canvas.SetLeftMargin(0.145)
+    canvas.SetRightMargin(0.11)
 
     # Calculate signal and background efficiency vs output
     xvalue, eff_s, eff_b, error = CalcEfficiency(htest_s, htest_b)
@@ -122,10 +127,6 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     
     plot.ApplyStyle(graph_s, ROOT.kBlue)
     plot.ApplyStyle(graph_b, ROOT.kRed)
-
-    for graph in [graph_s, graph_b]:
-        graph.GetXaxis().SetTitle("Output")
-        graph.GetYaxis().SetTitle("Efficiency")
     
     # Calculate significance vs output
     h_signif0, h_signif1 = CalcSignificance(htest_s, htest_b)
@@ -148,16 +149,16 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     #Significance: Get new maximum
     ymax = max(h_signifScaled0.GetMaximum(), h_signifScaled1.GetMaximum())
 
-    graph_s.SetMaximum(ymax*1.1)
-    graph_b.SetMaximum(ymax*1.1)
-    h_signifScaled0.SetMaximum(ymax*1.1)
-    h_signifScaled1.SetMaximum(ymax*1.1)
-    
+    for obj in [graph_s, graph_b, h_signifScaled0, h_signifScaled1]:
+        obj.GetXaxis().SetTitle("Output")
+        obj.GetYaxis().SetTitle("Efficiency")
+        obj.SetMaximum(ymax*1.1)
+        obj.SetMinimum(0)
     #Draw    
     h_signifScaled0.Draw("HIST")
     h_signifScaled1.Draw("HIST SAME")
-    graph_s.Draw("P SAME")
-    graph_b.Draw("P SAME")
+    graph_s.Draw("PL SAME")
+    graph_b.Draw("PL SAME")
 
     #Legend
     leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
@@ -237,25 +238,8 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
         else:
             color = ROOT.kRed
             
-        '''
-        histo.SetMarkerColor(color)
-        histo.SetLineColor(color)
-        histo.SetLineWidth(2)
-        histo.SetMarkerStyle(8)
-        histo.SetMarkerSize(0.8)
-        histo.GetXaxis().SetLabelSize(0.045)
-        histo.GetXaxis().SetTitleSize(0.05)
-        histo.GetXaxis().SetTitleOffset(1.)
-        histo.GetXaxis().SetTitleFont(42)
-        histo.GetYaxis().SetLabelSize(0.045)
-        histo.GetYaxis().SetTitleSize(0.05)
-        histo.GetYaxis().SetLabelFont(42)
-        histo.GetYaxis().SetLabelOffset(0.007)
-        histo.GetYaxis().SetTitleOffset(1.2)
-        histo.GetYaxis().SetTitleFont(42)
-        '''
         plot.ApplyStyle(h, color)
-        histo.SetMarkerSize(0.8)
+        histo.SetMarkerSize(0.5)
         histo.GetXaxis().SetTitle("Output")
         histo.GetYaxis().SetTitle("Entries")
         histo.SetMinimum(10)
@@ -312,7 +296,7 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     htest_b1  = htest_b.Clone("test_b")
 
     drawStyle = "HIST SAME"
-    leg=plot.CreateLegend(0.50, 0.68, 0.82, 0.88)
+    leg=plot.CreateLegend(0.55, 0.18, 0.85, 0.38)
     for h in hList:
         h.SetMaximum(ymax*2)        
 

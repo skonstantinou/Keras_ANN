@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 '''
 DESCRIPTION:
-This script provides an interface for conducting deep learning studies in python
-with Keras. The step included are:
+Keras is a modular, powerful and intuitive open-source Deep Learning library built on Theano and TensorFlow. Thanks to its minimalist, user-friendly interface, it has become one of the most popular packages to build, train and test neural networks. This script provides an interface for conducting deep learning studies in python with Keras. The step included are:
 1. Load Data.
 2. Define Keras Model.
 3. Compile Keras Model.
@@ -18,10 +17,11 @@ USAGE:
 
 EXAMPLES:
 ./sequential.py --test --activation relu -s png,pdf,root,C
+./sequential.py --test --activation relu,relu,sigmoid --neurons 36,19,1 -s pdf
 
 
 LAST USED:
-./sequential.py --test --activation relu -s pdf
+./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
 
 
 GITHUB:
@@ -34,7 +34,10 @@ https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
 https://keras.io/activations/
 https://keras.io/getting-started/
 https://keras.io/getting-started/faq/#what-does-sample-batch-epoch-mean
-uproot: https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281/319/rootTutorialWeek5_markhod_2018.pdf
+https://indico.cern.ch/event/749214/attachments/1754601/2844298/CERN_TH_Seminar_Nov2018.pdf#search=keras%20AND%20StartDate%3E%3D2018%2D10%2D01
+https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281/319/rootTutorialWeek5_markhod_2018.pdf
+https://indico.cern.ch/event/683620/timetable/#20190512.detailed
+https://cds.cern.ch/record/2157570
 
 '''
 #================================================================================================ 
@@ -60,12 +63,15 @@ from sklearn.externals import joblib
 
 import plot
 import func
+import tdrstyle
 
 import sys
+import time
 import datetime 
 from optparse import OptionParser
 import getpass
 import socket
+import shutil
 
 #================================================================================================
 # Variable definition
@@ -102,18 +108,27 @@ def Verbose(msg, printHeader=True, verbose=False):
 
 def main(opts): 
 
+    # Save start time (epoch seconds)
+    tStart = time.time()
+    Verbose("Started @ " + str(tStart), True)
+
     # Do not display canvases
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
 
     # Disable screen output info
     ROOT.gROOT.ProcessLine( "gErrorIgnoreLevel = 1001;")
 
+    style = tdrstyle.TDRStyle() 
+    style.setOptStat(False) 
+    style.setGridX(opts.gridX)
+    style.setGridY(opts.gridY)
+
     # Open the ROOT file
     ROOT.TFile.Open(opts.rootFileName)
 
     if opts.test:
-        opts.epochs  = 10
-        opts.batches = 5000
+        opts.epochs    = 10
+        opts.batchSize = 5000
 
     # Setting the seed for numpy-generated random numbers
     numpy.random.seed(opts.rndSeed)
@@ -217,20 +232,17 @@ def main(opts):
     layerN_activate = "sigmoid"
 
     # The Dense function defines each layer - how many neurons and mathematical function to use. (First hidden layer with "36" neurons, "nInputs" inputs, and "relu" as acivation function)
-    Print("Creating %slayer #1%s of model (# neurons = %d , activation=\"%s\")" % (hs, ns, layer1_neurons, layer1_activate), True)
-    model.add( Dense(layer1_neurons, input_dim = nInputs, activation = opts.activation) ) 
+    for iLayer, n in enumerate(opts.neurons, 0):
+        Print("Adding %slayer# %d%s, with %s%d neurons%s and activation function %s" % (ts, iLayer+1, ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
+        model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
 
-    # Second hidden layer with "19" neurons, and "relu" as activation function
-    Print("Creating %slayer #2%s of model (# neurons = %d , activation=\"%s\")" % (hs, ns, layer2_neurons, layer2_activate), False)
-    model.add( Dense(nInputs, activation = opts.activation) )
-
-    # Last layer (output layer) with 1 neuron and "sigmoid" as activation function (i.e. returns the output value which falls in the range of 0 to 1)
-    Print("Creating %soutput layer%s of model (# neurons = %d , activation=\"%s\")" % (ts, ns, layerN_neurons, layerN_activate), False)
-    model.add( Dense(1, activation = 'sigmoid') )
-
-    # Print out model summary
+    # Print a summary representation of your model. 
     Print("Printing model summary:", True)
     model.summary()
+
+    # Get a dictionary containing the configuration of the model. The model can be reinstantiated from its config via: model = Model.from_config(config)
+    if 0:
+        config = model.get_config()
     
     # Split data into input (X) and output (Y). (Note: dataset includes both signal and background sequentially)
     X = dset_all[:2*nsignal,0:nInputs] # rows: 0 -> 2*signal, columns: 0 -> 19
@@ -252,16 +264,16 @@ def main(opts):
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc']) 
     
     # Fit the model with our data
-    # (An "epoch" is an arbitrary cutoff, generally defined as "one pass over the entire dataset", 
+    # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
     # used to separate training into distinct phases, which is useful for logging and periodic evaluation.)
     hist = model.fit(X_train,
                      Y_train,
                      validation_data=(X_test, Y_test),
-                     epochs     = opts.epochs,   # one pass over the entire dataset
-                     batch_size = opts.batches,  # a set of N samples
-                     shuffle    = False,         # 
-                     verbose    = 1,             # 0=silent, 1=progress, 2=mention the number of epoch
-                     callbacks  = callbacks_list #
+                     epochs     = opts.epochs,    # one pass over the entire dataset
+                     batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
+                     shuffle    = False,
+                     verbose    = int(opts.logFile), # 0=silent, 1=progress, 2=mention the number of epoch
+                     callbacks  = callbacks_list
                  )
 
     if not opts.test:
@@ -278,7 +290,7 @@ def main(opts):
         model.save(modelName)
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
-    Print("Generating output predictions for the input samples (e.g. Numpy array)", True)
+    Print("Generating output predictions for the input samples", True) # (e.g. Numpy array)
     pred_train      = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
     pred_test       = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
     pred_signal     = model.predict(X_signal    , batch_size=None, verbose=1, steps=None)
@@ -304,19 +316,29 @@ def main(opts):
     pred_train_B =  model.predict(x_train_B, batch_size=None, verbose=1, steps=None)
     pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
     pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
-    # Keras version 2.2.5 or later (https://keras.io/models/model/)
-    # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
     # Plot some output
-    func.PlotOutput(pred_signal , pred_background, dirName, "Output_SB"      , 1, opts.saveFormats)
-    func.PlotOutput(pred_train  , pred_test      , dirName, "Output_pred"    , 0, opts.saveFormats)
-    func.PlotOutput(pred_train_S, pred_train_B   , dirName, "Output_SB_train", 1, opts.saveFormats)
-    func.PlotOutput(pred_test_S , pred_test_B    , dirName, "Output_SB_test" , 1, opts.saveFormats)
+    func.PlotOutput(pred_signal , pred_background, opts.saveDir, "Output_SB"      , 1, opts.saveFormats) #dump to json
+    func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
+    func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
+    func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
     
     # Calculate efficiency (Entries Vs Output)
-    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest", opts.saveFormats)
-    func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency", opts.saveFormats)
+    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
+    func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
     
+
+    # Print total time elapsed
+    tFinish = time.time()
+    dt      = int(tFinish) - int(tStart)
+    days    = divmod(dt,86400)      # days
+    hours   = divmod(days[1],3600)  # hours
+    mins    = divmod(hours[1],60)   # minutes
+    secs    = mins[1]               # seconds
+    Print("Total elapsed time is %s days, %s hours, %s mins, %s secs" % (days[0], hours[0], mins[0], secs), True)
+    
+    # Copy logfile to results directory
+    shutil.copy(opts.logFile, os.path.join(opts.saveDir, opts.logFile))
     return 
 
 #================================================================================================ 
@@ -349,8 +371,10 @@ if __name__ == "__main__":
     TEST         = False
     RNDSEED      = 1234
     EPOCHS       = 5000
-    BATCHES      = 500
+    BATCHSIZE    = 500  # See: http://stats.stackexchange.com/questions/153531/ddg#153535
     ACTIVATION   = "relu" # "relu" or PReLU" or "LeakyReLU"
+    NEURONS      = "36,19,1"
+    LOG          = False
 
     # Define the available script options
     parser = OptionParser(usage="Usage: %prog [options]")
@@ -382,18 +406,72 @@ if __name__ == "__main__":
     parser.add_option("--epochs", dest="epochs", type=int, default=EPOCHS, 
                       help="Number of \"epochs\" to be used (how many times you go through your training set) [default: %s]" % EPOCHS)
 
-    parser.add_option("--batches", dest="batches", type=int, default=BATCHES,
-                      help="Number of \"batches\" to be used (the larger the batch the better the appoximation. Larger batches will usually result in faster evaluation) [default: %s]" % EPOCHS)
+    parser.add_option("--batchSize", dest="batchSize", type=int, default=BATCHSIZE,
+                      help="The \"batch size\" to be used (= a number of samples processed before the model is updated). Batch size impacts learning significantly; typically networks trains faster with mini-batches. However, the batch size has a direct impact on the variance of gradients (the larger the batch the better the appoximation and the largef the memory usage). [default: %s]" % BATCHSIZE)
 
     parser.add_option("--activation", dest="activation", type="string", default=ACTIVATION,
-                      help=" Type of transfer function that will be used to map the output of one layer to another [default: %s]" % ACTIVATION)
+                      help="Type of transfer function that will be used to map the output of one layer to another [default: %s]" % ACTIVATION)
+
+    parser.add_option("--neurons", dest="neurons", type="string", default=NEURONS,
+                      help="List of neurons to use for each sequential layer (comma-separated integers)  [default: %s]" % NEURONS)
+
+    parser.add_option("--log", dest="log", type="store_true", default=LOG,
+                      help="Boolean for redirect sys.stdout to a log file [default: %s]" % LOG)
 
     (opts, parseArgs) = parser.parse_args()
-
+    
     # Require at least two arguments (script-name, ...)
     if len(sys.argv) < 1:
         parser.print_help()
         sys.exit(1)
+    else:
+        pass
+        
+    # Create save formats
+    if "," in opts.saveFormats:
+        opts.saveFormats = opts.saveFormats.split(",")
+    else:
+        opts.saveFormats = [opts.saveFormats]
+    #opts.saveFormats = ["." + s for s in opts.saveFormats]
+    opts.saveFormats = [s for s in opts.saveFormats]
+    Print("Will save all output in %d format(s): %s" % (len(opts.saveFormats), ss + ", ".join(opts.saveFormats) + ns), True)
+
+    # Create specification lists
+    if "," in opts.activation:
+        opts.activation = opts.activation.split(",")
+    else:
+        opts.activation = [opts.activation]
+    Verbose("Activation = %s" % (opts.activation), True)
+    if "," in opts.neurons:
+        opts.neurons = list(map(int, opts.neurons.split(",")) )
+    else:
+        opts.neurons = list(map(int, [opts.neurons]))
+    Verbose("Neurons = %s" % (opts.neurons), True)
+        
+    # Sanity checks (One activation function for each layer)
+    if len(opts.neurons) != len(opts.activation):
+        msg = "The list of neurons (size=%d) is not the same size as the list of activation functions (=%d)" % (len(opts.neurons), len(opts.activation))
+        raise Exception(es + msg + ns)  
+    # Sanity check (Last layer)
+    if opts.neurons[-1] != 1:
+        msg = "The number of neurons for the last layer should be equal to 1 (=%d instead)" % (opts.neurons[-1])
+        raise Exception(es + msg + ns)  
+    if opts.neurons[-1] != 1:
+        msg = "The activation function for the last layer should be set to \"sigmoid\"  (=%s instead)" % (opts.activation[-1])
+        raise Exception(es + msg + ns)  
+
+    # Define dir/logfile names
+    specs = "%dLayers" % (len(opts.neurons))
+    for i,n in enumerate(opts.neurons, 0):
+        specs+= "_%s%s" % (opts.neurons[i], opts.activation[i])
+    specs+= "_%dEpochs_%dBatchSize" % (opts.epochs, opts.batchSize)
+    date  = datetime.date.today().strftime("%d%h%Y")
+    sName = "Keras_%s_%s" % (specs, date)
+    # Determine logFile name
+    if opts.log:
+        opts.logFile = sName + ".log"
+    else:
+        opts.logFile = None
 
     # Determine path for saving plots
     if opts.saveDir == None:
@@ -404,29 +482,41 @@ if __name__ == "__main__":
             myDir = "/afs/cern.ch/user/%s/%s/public/html/" % (usrInit, usrName)
         else:
             myDir = os.path.join(os.getcwd())
-        opts.saveDir = os.path.join(myDir, "Keras_", datetime.date.today().strftime("%d%h%Y") ) 
+        opts.saveDir = os.path.join(myDir, sName)
     else:
         pass
+
+    # Create logfile
+    if opts.log:
+        Print("Creating log file %s" % (opts.logFile), True)
+        sys.stdout = open(opts.logFile, 'w')
+
+    # Inform user
+    table    = []
+    msgAlign = "{:^10} {:^10} {:>12}"
+    title    =  msgAlign.format("Layer #", "Neurons", "Activation")
+    hLine    = "="*len(title)
+    table.append(hLine)
+    table.append(title)
+    table.append(hLine)
+    for i, n in enumerate(opts.neurons, 0): 
+        table.append( msgAlign.format(i+1, opts.neurons[i], opts.activation[i]) )
+    table.append("")
+    for r in table:
+        Print(r, False)
 
     # See https://keras.io/activations/
     actList = ["elu", "softmax", "selu", "softplus", "softsign", "PReLU", "LeakyReLU",
                "relu", "tanh", "sigmoid", "hard_sigmoid", "exponential", "linear"] # Loukas used "relu"
-    if opts.activation not in actList:
-        msg = "Unsupported activation function %s. Please select on of the following:%s\n\t%s" % (opts.activation, ss, "\n\t".join(actList))
-        raise Exception(es + msg + ns)
+    # Sanity checks
+    for a in opts.activation:
+        if a not in actList:
+            msg = "Unsupported activation function %s. Please select on of the following:%s\n\t%s" % (opts.activation, ss, "\n\t".join(actList))
+            raise Exception(es + msg + ns)    
     
-
-    # Create save formats
-    if "," in opts.saveFormats:
-        opts.saveFormats = opts.saveFormats.split(",")
-    else:
-        opts.saveFormats = [opts.saveFormats]
-    #opts.saveFormats = ["." + s for s in opts.saveFormats]
-    opts.saveFormats = [s for s in opts.saveFormats]
-    Print("Will save all output in %d formats: %s" % (len(opts.saveFormats), ss + ", ".join(opts.saveFormats) + ns), True)
-
     # Call the main function
-    Print("Using Keras %s" % (ss + keras.__version__ + ns), True)
+    Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
+    sys.exit()
     main(opts)
 
     if opts.notBatchMode:
