@@ -308,7 +308,6 @@ def main(opts):
     # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
     # Plot some output
-    dirName = plot.getDirName("Keras") # fixme - replace with opts.saveDir
     func.PlotOutput(pred_signal , pred_background, dirName, "Output_SB"      , 1, opts.saveFormats)
     func.PlotOutput(pred_train  , pred_test      , dirName, "Output_pred"    , 0, opts.saveFormats)
     func.PlotOutput(pred_train_S, pred_train_B   , dirName, "Output_SB_train", 1, opts.saveFormats)
@@ -406,6 +405,8 @@ if __name__ == "__main__":
         else:
             myDir = os.path.join(os.getcwd())
         opts.saveDir = os.path.join(myDir, "Keras_", datetime.date.today().strftime("%d%h%Y") ) 
+    else:
+        pass
 
     # See https://keras.io/activations/
     actList = ["elu", "softmax", "selu", "softplus", "softsign", "PReLU", "LeakyReLU",
