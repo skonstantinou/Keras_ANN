@@ -102,8 +102,11 @@ def CalcSignificance(htest_s, htest_b):
         # Get selected events                                                                                                                                                                       
         sSel = htest_s.IntegralAndError(i, nbins+1, sigmaSel_s, "")
         bSel = htest_b.IntegralAndError(i, nbins+1, sigmaSel_b, "")
-        # Calculate Significance                                                                                                                                                                    
-        _sign0 = sSel/math.sqrt(sSel+bSel)
+        # Calculate Significance
+        _sign0 = 0
+        if (sSel+bSel > 0):
+            _sign0 = sSel/math.sqrt(sSel+bSel)
+
         _sign1 = 2*(math.sqrt(sSel+bSel) - math.sqrt(bSel))
         h_signif0.Fill(htest_s.GetBinCenter(i), _sign0)        
         h_signif1.Fill(htest_s.GetBinCenter(i), _sign1)        
@@ -159,6 +162,9 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     h_signifScaled1.Draw("HIST SAME")
     graph_s.Draw("PL SAME")
     graph_b.Draw("PL SAME")
+
+    graph = plot.CreateGraph([0.5, 0.5], [0, ymax*1.1])
+    graph.Draw("same")
 
     #Legend
     leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
@@ -287,9 +293,8 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
             
     for i in range(len(DataList)):
         for r in DataList[i]:
-            hList[i].Fill(r)        
-        ymax = max(ymax, hList[i].GetMaximum())
-    
+            hList[i].Fill(r)            
+
     htrain_s1 = htrain_s.Clone("train_s")
     htrain_b1 = htrain_b.Clone("train_b")
     htest_s1  = htest_s.Clone("test_s")
@@ -298,9 +303,9 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     drawStyle = "HIST SAME"
     leg=plot.CreateLegend(0.55, 0.18, 0.85, 0.38)
     for h in hList:
-        h.SetMaximum(ymax*2)        
-
         h.Rebin(10)
+        ymax = max (htrain_s.GetMaximum(), htest_s.GetMaximum(), htrain_b.GetMaximum(), htest_b.GetMaximum())
+        h.SetMaximum(ymax*2)
         # Legend
         legText, legStyle = GetLegendStyle(h.GetName())
         leg.AddEntry(h, legText, legStyle)
