@@ -11,6 +11,19 @@ Keras is a modular, powerful and intuitive open-source Deep Learning library bui
 7. Make Predictions
 
 
+OPTIMISATION:
+Basically it is just trial and error. The number of layers and the number of nodes in Keras (aka "hyperparameters") should be tuned on a validation set (split from your original data into train/validation/test).
+Tuning just means trying different combinations of parameters and keep the one with the lowest loss value or better accuracy on the validation set, depending on the problem.
+There are two basic methods:
+Grid search: For each parameter, decide a range and steps into that range, like 8 to 64 neurons, in powers of two (8, 16, 32, 64), and try each combination of the parameters. 
+Random search: Do the same but just define a range for each parameter and try a random set of parameters, drawn from an uniform distribution over each range. 
+Unfortunately there is no other way to tune such parameters. Just keep in mind that a deep model provides a hierarchy of layers that build up increasing levels of abstraction 
+from the space of the input variables to the output variables.
+About layers having different number of neurons, that could come from the tuning process, or you can also see it as dimensionality reduction, like a compressed version of the previous layer.
+https://stackoverflow.com/questions/36950394/how-to-decide-the-size-of-layers-in-keras-dense-method
+https://machinelearningmastery.com/how-to-configure-the-number-of-layers-and-nodes-in-a-neural-network/
+
+
 USAGE:
 ./sequential.py [opts]
 
@@ -175,7 +188,7 @@ def main(opts):
     # Get the index (row labels) of the DataFrame.
     nsignal = len(df_signal.index)
     nbkg    = len(df_background.index)
-    Print("Signal has %s%d%s row labels. Background has %s%d%s row labels" % (ss, nsignal, ns, es, nbkg, ns), True)
+    Verbose("Signal has %s%d%s row labels. Background has %s%d%s row labels" % (ss, nsignal, ns, es, nbkg, ns), True)
     
     # Sanity check?
     columns = list(df_signal.columns.values)
@@ -224,17 +237,25 @@ def main(opts):
     model = Sequential()
 
     # The best network structure is found through a process of trial and error experimentation. Generally, you need a network large enough to capture the structure of the problem.
-    layer1_neurons  = 36
-    layer2_neurons  = nInputs
-    layerN_neurons  = 1
-    layer1_activate = opts.activation
-    layer2_activate = opts.activation
-    layerN_activate = "sigmoid"
-
     # The Dense function defines each layer - how many neurons and mathematical function to use. (First hidden layer with "36" neurons, "nInputs" inputs, and "relu" as acivation function)
     for iLayer, n in enumerate(opts.neurons, 0):
-        Print("Adding %slayer# %d%s, with %s%d neurons%s and activation function %s" % (ts, iLayer+1, ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
-        model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
+        layer = "%d layer#" % (int(iLayer)+1)
+        if iLayer == 0:
+            layer += " (input Layer)" # Input variables, sometimes called the visible layer.
+        elif iLayer == len(opts.neurons)-1:
+            layer += " (output Layer)" # Layers of nodes between the input and output layers. There may be one or more of these layers.
+        else:
+            layer += " (hidden layer)" # A layer of nodes that produce the output variables.
+            
+        Print("Adding %s, with %s%d neurons%s and activation function %s" % (ts + layer + ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
+        if iLayer == 0:
+            model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
+            #model.add(Activation('softmax'))
+        else:
+            if 0: #opts.neurons[iLayer] < nInputs:
+                msg = "The number of  neurons (=%d) is less than the number of input variables (=%d). Please set the number of neurons to be at least the number of inputs!" % (opts.neurons[iLayer], nInputs)
+                raise Exception(es + msg + ns)  
+            model.add( Dense(opts.neurons[iLayer], activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
 
     # Print a summary representation of your model. 
     Print("Printing model summary:", True)
@@ -245,11 +266,13 @@ def main(opts):
         config = model.get_config()
     
     # Split data into input (X) and output (Y). (Note: dataset includes both signal and background sequentially)
+    # Use only 2*nsignal rows => First nSignal rows is the signal. Another (equal) nSignal rows for the bkg. 
+    # Therefore signal and bkg have exactly the same number
     X = dset_all[:2*nsignal,0:nInputs] # rows: 0 -> 2*signal, columns: 0 -> 19
     Y = dset_all[:2*nsignal,nInputs:]  # rows: 0 -> 2*signal, columns: 19 (isSignal = 0 or 1)
-    #
     X_signal     = dset_signal[:nsignal, 0:nInputs]
     X_background = dset_background[:nsignal, 0:nInputs]
+    Print("Signal dataset has %s%d%s rows. Background dataset has %s%d%s rows" % (ss, len(X_signal), ns, es, len(X_background), ns), True)
 
     # Split the datasets (X= 19 inputs, Y=output variable). Test size 0.5 means half for training half for testing
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5, random_state=opts.rndSeed, shuffle=True)
@@ -258,10 +281,10 @@ def main(opts):
     earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50)
     callbacks_list = [earlystop]
 
-    # Compile the model with the chosen loss function. #acc = accuracy. Optimize loss function, optimizer
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
     # Optimizer function is related to a function used to optimise the weights
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc']) 
+    Print("Compiling the model with the loss function %s and optimizer %s " % (ls + opts.lossFunction + ns, ls + opts.optimizer + ns), True)
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
@@ -272,7 +295,7 @@ def main(opts):
                      epochs     = opts.epochs,    # one pass over the entire dataset
                      batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
                      shuffle    = False,
-                     verbose    = int(opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
+                     verbose    = int(not opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
                      callbacks  = callbacks_list
                  )
 
@@ -319,9 +342,10 @@ def main(opts):
 
     # Plot some output
     func.PlotOutput(pred_signal , pred_background, opts.saveDir, "Output_SB"      , 1, opts.saveFormats) #dump to json
-    func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
-    func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
-    func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
+    if 0:
+        func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
+        func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
+        func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
     
     # Calculate efficiency (Entries Vs Output)
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
@@ -379,6 +403,8 @@ if __name__ == "__main__":
     LOG          = False
     GRIDX        = False
     GRIDY        = False
+    LOSSFUNCTION = 'binary_crossentropy'
+    OPTIMIZER    = 'adam'
 
     # Define the available script options
     parser = OptionParser(usage="Usage: %prog [options]")
@@ -411,13 +437,19 @@ if __name__ == "__main__":
                       help="Number of \"epochs\" to be used (how many times you go through your training set) [default: %s]" % EPOCHS)
 
     parser.add_option("--batchSize", dest="batchSize", type=int, default=BATCHSIZE,
-                      help="The \"batch size\" to be used (= a number of samples processed before the model is updated). Batch size impacts learning significantly; typically networks trains faster with mini-batches. However, the batch size has a direct impact on the variance of gradients (the larger the batch the better the appoximation and the largef the memory usage). [default: %s]" % BATCHSIZE)
+                      help="The \"batch size\" to be used (= a number of samples processed before the model is updated). Batch size impacts learning significantly; typically networks trains faster with mini-batches. However, the batch size has a direct impact on the variance of gradients (the larger the batch the better the appoximation and the larger the memory usage). [default: %s]" % BATCHSIZE)
 
     parser.add_option("--activation", dest="activation", type="string", default=ACTIVATION,
                       help="Type of transfer function that will be used to map the output of one layer to another [default: %s]" % ACTIVATION)
 
     parser.add_option("--neurons", dest="neurons", type="string", default=NEURONS,
                       help="List of neurons to use for each sequential layer (comma-separated integers)  [default: %s]" % NEURONS)
+
+    parser.add_option("--lossFunction", dest="lossFunction", type="string", default=LOSSFUNCTION,
+                      help="Name of loss function; one of the two parameters required to compile a model: [default: %s]" % LOSSFUNCTION)
+
+    parser.add_option("--optimizer", dest="optimizer", type="string", default=OPTIMIZER,
+                      help="Name of optimizer function; one of the two parameters required to compile a model: [default: %s]" % OPTIMIZER)
 
     parser.add_option("--log", dest="log", action="store_true", default=LOG,
                       help="Boolean for redirect sys.stdout to a log file [default: %s]" % LOG)
@@ -465,11 +497,12 @@ if __name__ == "__main__":
     # Sanity check (Last layer)
     if opts.neurons[-1] != 1:
         msg = "The number of neurons for the last layer should be equal to 1 (=%d instead)" % (opts.neurons[-1])
-        raise Exception(es + msg + ns)  
-    if opts.neurons[-1] != 1:
-        msg = "The activation function for the last layer should be set to \"sigmoid\"  (=%s instead)" % (opts.activation[-1])
-        raise Exception(es + msg + ns)  
-
+        raise Exception(es + msg + ns)   
+        #Print(es + msg + ns, True) 
+    if opts.activation[-1] != "sigmoid":
+        msg = "The activation function for the last layer should be set to \"sigmoid\"  (=%s instead)" % (opts.activation[-1])        
+        raise Exception(es + msg + ns)  #Print(es + msg + ns, True)
+    
     # Define dir/logfile names
     specs = "%dLayers" % (len(opts.neurons))
     for i,n in enumerate(opts.neurons, 0):
@@ -483,7 +516,8 @@ if __name__ == "__main__":
     nYear  = now.strftime("%Y")
     nTime  = now.strftime("%Hh%Mm") #now.strftime("%Hh%Mm%Ss")
     #nDate  = "%s_%s_%s" % (nDay, nMonth, nTime)
-    nDate  = "%s-%s-%s-%s" % (nDay, nMonth, nYear, nTime)
+    #nDate  = "%s-%s-%s-%s" % (nDay, nMonth, nYear, nTime)
+    nDate  = "%s-%s-%s_%s" % (nDay, nMonth, nYear, nTime)
     sName  = "Keras_%s_%s" % (specs, nDate)
 
     # Determine logFile name
@@ -532,6 +566,23 @@ if __name__ == "__main__":
         if a not in actList:
             msg = "Unsupported activation function %s. Please select on of the following:%s\n\t%s" % (opts.activation, ss, "\n\t".join(actList))
             raise Exception(es + msg + ns)    
+    
+    # See https://keras.io/losses/
+    lossList = ["mean_squared_error", "mean_absolute_error", "mean_absolute_percentage_error", "mean_squared_logarithmic_error", "squared_hinge",
+                "hinge", "categorical_hinge", "logcosh", "huber_loss", "categorical_crossentropy", "sparse_categorical_crossentropy", "binary_crossentropy", 
+                "kullback_leibler_divergenc", "poisson", "cosine_proximity", "is_categorical_crossentropy"]
+    # Sanity checks
+    if opts.lossFunction not in lossList:
+        msg = "Unsupported loss function %s. Please select on of the following:%s\n\t%s" % (opts.lossFunction, ss, "\n\t".join(lossList))
+        raise Exception(es + msg + ns)    
+
+    # See https://keras.io/optimizers/
+    optList = ["sgd", "rmsprop", "adagrad", "adadelta", "adam", "adamax", "nadam"]
+    # optList = ["SGD", "RMSprop", "Adagrad", "Adadelta", "Adam", "Adamax", "Nadam"]
+    # Sanity checks
+    if opts.optimizer not in optList:
+        msg = "Unsupported loss function %s. Please select on of the following:%s\n\t%s" % (opts.optimizer, ss, "\n\t".join(optList))
+        raise Exception(es + msg + ns)    
     
     # Call the main function
     Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
