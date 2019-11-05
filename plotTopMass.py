@@ -59,8 +59,8 @@ def main():
     inputList.append("TrijetSubldgJetBDisc")
     inputList.append("TrijetBJetLdgJetMass")
     inputList.append("TrijetBJetSubldgJetMass")
-    #inputList.append("TrijetMass")
-    #inputList.append("TrijetDijetMass")
+    inputList.append("TrijetMass")
+    inputList.append("TrijetDijetMass")
     inputList.append("TrijetBJetBDisc")
     inputList.append("TrijetSoftDrop_n2")
     inputList.append("TrijetLdgJetCvsL")
@@ -101,7 +101,7 @@ def main():
     target = dataset_target_bkg[:nEvts, :]
 
     #Load models
-    lamValues = [1, 5, 10, 50] # fixme! should be given as option
+    lamValues = [1, 5, 10, 50, 100, 500] # fixme! should be given as option
     colors = [ROOT.kBlack, ROOT.kOrange, ROOT.kBlue, ROOT.kRed, ROOT.kGreen, ROOT.kMagenta, ROOT.kOrange+7]
     canvas = plot.CreateCanvas()
     canvas.cd()
@@ -111,7 +111,7 @@ def main():
     histoList = []
     for lam in lamValues:
         print "Lambda = ", lam
-        loaded_model = load_model('models_30Oct/modelANN_lam%s.h5' % (lam))
+        loaded_model = load_model('modelANN_lam%s.h5' % (lam))
         #loaded_model = load_model('modelANN_lam%s.h5' % (lam))
         loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
         Y = loaded_model.predict(X, verbose=1)
