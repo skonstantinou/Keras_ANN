@@ -18,10 +18,11 @@ USAGE:
 EXAMPLES:
 ./sequential.py --test --activation relu -s png,pdf,root,C
 ./sequential.py --test --activation relu,relu,sigmoid --neurons 36,19,1 -s pdf
+./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
 
 
 LAST USED:
-./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
+./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 10000 --batchSize 50000 -s pdf --log
 
 
 GITHUB:
@@ -67,11 +68,10 @@ import tdrstyle
 
 import sys
 import time
-import datetime 
+from datetime import datetime 
 from optparse import OptionParser
 import getpass
 import socket
-import shutil
 
 #================================================================================================
 # Variable definition
@@ -272,7 +272,7 @@ def main(opts):
                      epochs     = opts.epochs,    # one pass over the entire dataset
                      batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
                      shuffle    = False,
-                     verbose    = int(opts.logFile), # 0=silent, 1=progress, 2=mention the number of epoch
+                     verbose    = int(opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
                      callbacks  = callbacks_list
                  )
 
@@ -307,7 +307,7 @@ def main(opts):
     x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs] #iro - fixme - understand
     x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
 
-    Print("Select events/samples which have an output variable Y (last column) equal to 0 (i.e. prediction is NOT combatible with signal)", True)
+    Print("Select events/samples which have an output variable Y (last column) equal to 0 (i.e. prediction is NOT combatible with signal)", False)
     x_train_B = XY_train[XY_train[:,nInputs] == 0]; x_train_B = x_train_B[:,0:nInputs]
     x_test_B  = XY_test[XY_test[:,nInputs] == 0];   x_test_B  = x_test_B[:,0:nInputs]
     
@@ -327,7 +327,6 @@ def main(opts):
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
     func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
     
-
     # Print total time elapsed
     tFinish = time.time()
     dt      = int(tFinish) - int(tStart)
@@ -338,7 +337,10 @@ def main(opts):
     Print("Total elapsed time is %s days, %s hours, %s mins, %s secs" % (days[0], hours[0], mins[0], secs), True)
     
     # Copy logfile to results directory
-    shutil.copy(opts.logFile, os.path.join(opts.saveDir, opts.logFile))
+    if opts.log:
+        logPath = os.path.join(opts.saveDir, opts.logFile)
+        os.system("mv %s %s" % (opts.logFile, logPath))
+        Print("Log file %s moved to %s" % (ls + opts.logFile + ns, ts + logPath + ns), True)
     return 
 
 #================================================================================================ 
@@ -375,6 +377,8 @@ if __name__ == "__main__":
     ACTIVATION   = "relu" # "relu" or PReLU" or "LeakyReLU"
     NEURONS      = "36,19,1"
     LOG          = False
+    GRIDX        = False
+    GRIDY        = False
 
     # Define the available script options
     parser = OptionParser(usage="Usage: %prog [options]")
@@ -415,8 +419,14 @@ if __name__ == "__main__":
     parser.add_option("--neurons", dest="neurons", type="string", default=NEURONS,
                       help="List of neurons to use for each sequential layer (comma-separated integers)  [default: %s]" % NEURONS)
 
-    parser.add_option("--log", dest="log", type="store_true", default=LOG,
+    parser.add_option("--log", dest="log", action="store_true", default=LOG,
                       help="Boolean for redirect sys.stdout to a log file [default: %s]" % LOG)
+
+    parser.add_option("--gridX", dest="gridX", action="store_true", default=GRIDX,
+                      help="Enable x-axis grid [default: %s]" % GRIDX)
+
+    parser.add_option("--gridY", dest="gridY", action="store_true", default=GRIDY,
+                      help="Enable y-axis grid [default: %s]" % GRIDY)
 
     (opts, parseArgs) = parser.parse_args()
     
@@ -434,7 +444,7 @@ if __name__ == "__main__":
         opts.saveFormats = [opts.saveFormats]
     #opts.saveFormats = ["." + s for s in opts.saveFormats]
     opts.saveFormats = [s for s in opts.saveFormats]
-    Print("Will save all output in %d format(s): %s" % (len(opts.saveFormats), ss + ", ".join(opts.saveFormats) + ns), True)
+    Verbose("Will save all output in %d format(s): %s" % (len(opts.saveFormats), ss + ", ".join(opts.saveFormats) + ns), True)
 
     # Create specification lists
     if "," in opts.activation:
@@ -465,13 +475,19 @@ if __name__ == "__main__":
     for i,n in enumerate(opts.neurons, 0):
         specs+= "_%s%s" % (opts.neurons[i], opts.activation[i])
     specs+= "_%dEpochs_%dBatchSize" % (opts.epochs, opts.batchSize)
-    date  = datetime.date.today().strftime("%d%h%Y")
-    sName = "Keras_%s_%s" % (specs, date)
+
+    # Get the current date and time
+    now    = datetime.now()
+    nDay   = now.strftime("%d")
+    nMonth = now.strftime("%h")
+    nYear  = now.strftime("%Y")
+    nTime  = now.strftime("%Hh%Mm") #now.strftime("%Hh%Mm%Ss")
+    #nDate  = "%s_%s_%s" % (nDay, nMonth, nTime)
+    nDate  = "%s-%s-%s-%s" % (nDay, nMonth, nYear, nTime)
+    sName  = "Keras_%s_%s" % (specs, nDate)
+
     # Determine logFile name
-    if opts.log:
-        opts.logFile = sName + ".log"
-    else:
-        opts.logFile = None
+    opts.logFile = sName + ".log"
 
     # Determine path for saving plots
     if opts.saveDir == None:
@@ -487,9 +503,12 @@ if __name__ == "__main__":
         pass
 
     # Create logfile
+    bak_stdout = sys.stdout
+    log_file = open(opts.logFile, 'w')
     if opts.log:
-        Print("Creating log file %s" % (opts.logFile), True)
-        sys.stdout = open(opts.logFile, 'w')
+        # Keep a copy of the original "stdout"
+        sys.stdout = log_file
+        Print("Log file %s created" % (ls + opts.logFile + ns), True)
 
     # Inform user
     table    = []
@@ -516,8 +535,13 @@ if __name__ == "__main__":
     
     # Call the main function
     Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
-    sys.exit()
     main(opts)
+
+    # Restore "stdout" to its original state and close the log file
+    sys.stdout =  bak_stdout
+    log_file.close()
+
+    Print("All output saved under directory %s" % (ls + opts.saveDir + ns), True)
 
     if opts.notBatchMode:
         raw_input("=== sequential.py: Press any key to quit ROOT ...")
