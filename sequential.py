@@ -307,7 +307,7 @@ def main(opts):
         model_json = model.to_json()
         with open("model_architecture.json", "w") as json_file:
             json_file.write(model_json)
-
+        
         # serialize weights to HDF5
         model.save_weights('model_weights.h5', overwrite=True)
         model.save(modelName)
@@ -342,6 +342,14 @@ def main(opts):
 
     # Plot some output
     func.PlotOutput(pred_signal , pred_background, opts.saveDir, "Output_SB"      , 1, opts.saveFormats) #dump to json
+    # tmp - start
+    for s in pred_signal:
+        print "s = ", s[0]
+    for b in pred_background:
+        print "b = ", b[0]
+    # tmp - end
+    # iro -fixme
+    # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
     if 0:
         func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
         func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
