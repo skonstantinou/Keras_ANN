@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# LAST USED: ./trainTopTagger_decorrelated.py --lam 10 --nepochs 200
+
 #uproot: https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281/319/rootTutorialWeek5_markhod_2018.pdf
 import keras
 import uproot
