@@ -66,12 +66,13 @@ def getDirName(dirName, baseDir=None):
     dirName = "/afs/cern.ch/user/%s/%s/public/html/%s" % (usrInit, usrName, dirName)
     return dirName
 
-def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"]):
+def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=False):
     
     # Create output directory if it does not exist
     if not os.path.exists(saveDir):
         os.mkdir(saveDir)
-        print "Directory " , saveDir ,  " has been created "
+        if 0:
+            print "Directory " , saveDir ,  " has been created "
     else:
         if 0:
             print "Output saved under", saveDir
@@ -84,7 +85,8 @@ def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"]):
     for ext in saveFormats:
         fileName = "%s.%s" % (savePath, ext)
         canvas.SaveAs( fileName )
-        print "=== ","%s.%s" % (saveURL, ext)
+        if verbose:
+            print "=== ","%s.%s" % (saveURL, ext)
     return
 
 def ApplyStyle(h, color):
