@@ -45,6 +45,7 @@ https://github.com/attikis/Keras_ANN
 
 
 URL:
+https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw <----- Really good
 https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
 https://keras.io/activations/
 https://keras.io/getting-started/
@@ -129,7 +130,7 @@ def writeCfgFile(opts):
     jsonWr.addParameter("layers", len(opts.neurons))
     jsonWr.addParameter("hidden layers", len(opts.neurons)-2)
     jsonWr.addParameter("activation functions", [a for a in opts.activation])
-    jsonWr.addParameter("neurons ", [n for n in opts.neurons])
+    jsonWr.addParameter("neurons", [n for n in opts.neurons])
     jsonWr.addParameter("loss function", opts.lossFunction)
     jsonWr.addParameter("optimizer", opts.optimizer)
     jsonWr.addParameter("epochs", opts.epochs)
@@ -268,11 +269,14 @@ def main(opts):
             layer += " (input Layer)" # Input variables, sometimes called the visible layer.
         elif iLayer == len(opts.neurons)-1:
             layer += " (output Layer)" # Layers of nodes between the input and output layers. There may be one or more of these layers.
-        else:
+        else:            
             layer += " (hidden layer)" # A layer of nodes that produce the output variables.
             
         Print("Adding %s, with %s%d neurons%s and activation function %s" % (ts + layer + ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
         if iLayer == 0:
+            if opts.neurons[iLayer] != nInputs > 1:
+                msg = "The number of neurons must equal the number of features (colimns) in your data. Some NN configuration add one additional node for a bias term"
+                Print(msg, True)
             model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
             #model.add(Activation('softmax'))
         else:
@@ -369,12 +373,13 @@ def main(opts):
     resDict = {}
     resDict["signal"]     = pred_signal
     resDict["background"] = pred_background
-    gList = func.PlotAndSave(resDict, opts.saveDir, "Output_SB", opts.saveFormats) #dump to json
+    gList = func.PlotAndGetGraphList(resDict, opts.saveDir, "Output_SB", opts.saveFormats) #dump to json
     # Write to json file
-    jsonWr = JsonWriter(saveDir=saveDir, verbose=False)
+    jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
     for gr in gList:
-        jsonWr.addGraph(saveName + "_" + gr.GetName(), gr)
-    jsonWr.addParameter("scenario", "worst-case")                                                                                                                                                                         
+        jsonWr.addGraph("Output_SB" + "_" + gr.GetName(), gr)
+    #jsonWr.addParameter("scenario", "worst-case")                                                                                                                                                                         
+    # Only write results in the resultsJSON file!
     jsonWr.write(opts.resultsJSON)
 
     if 0:
@@ -629,7 +634,20 @@ if __name__ == "__main__":
     if opts.optimizer not in optList:
         msg = "Unsupported loss function %s. Please select on of the following:%s\n\t%s" % (opts.optimizer, ss, "\n\t".join(optList))
         raise Exception(es + msg + ns)    
-    
+
+    # Determine number of layers
+    opts.nLayers = len(opts.neurons)
+    opts.nHiddenLayers = len(opts.neurons)-2
+    # Sanity check
+    if opts.nHiddenLayers < 1:
+        msg = "The NN has %d hidden layers. It must have at least 1 hidden layer" % (opts.nHiddenLayers)
+        raise Exception(es + msg + ns)    
+    else:
+        msg = "The NN has %s%d hidden layers%s (in addition to input and output layers)." % (hs, opts.nHiddenLayers, ns)
+        Print(msg, True) 
+        msg = "[NOTE: One hidden layer is sufficient for the large majority of problems. In general, the optimal size of the hidden layer is usually between the size of the input and size of the output layers.]"
+        Print(msg, False)         
+
     # Call the main function
     Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
     main(opts)

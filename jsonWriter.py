@@ -15,6 +15,8 @@ class JsonWriter:
         self.parameters = {}
         self.verbose = verbose
         self.saveDir = saveDir
+        if not os.path.exists(self.saveDir):
+            os.makedirs(self.saveDir)
         return
 
     def Print(self, msg, printHeader=False):
@@ -79,6 +81,10 @@ class JsonWriter:
                 fOUT.write("  ],\n")
             else:
                 fOUT.write("  ]\n")
+
+        # In case no graphs are saved do NOT finish with comma! (invalid JSON file format)
+        if len(self.graphs.keys()) < 1:
+            fOUT.write("  \"dumbie\": \"None\"\n")
 
         # Write and close the file
         fOUT.write("}\n")
