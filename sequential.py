@@ -32,6 +32,7 @@ EXAMPLES:
 ./sequential.py --test --activation relu -s png,pdf,root,C
 ./sequential.py --test --activation relu,relu,sigmoid --neurons 36,19,1 -s pdf
 ./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
+./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 100 --batchSize 500 -s pdf --saveDir Test
 
 
 LAST USED:
@@ -78,6 +79,7 @@ from sklearn.externals import joblib
 import plot
 import func
 import tdrstyle
+from jsonWriter import JsonWriter 
 
 import sys
 import time
@@ -118,12 +120,34 @@ def Verbose(msg, printHeader=True, verbose=False):
     Print(msg, printHeader)
     return
 
+def writeCfgFile(opts):
+
+    # Write to json file
+    jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
+
+    jsonWr.addParameter("model", "sequential")
+    jsonWr.addParameter("layers", len(opts.neurons))
+    jsonWr.addParameter("hidden layers", len(opts.neurons)-2)
+    jsonWr.addParameter("activation functions", [a for a in opts.activation])
+    jsonWr.addParameter("neurons ", [n for n in opts.neurons])
+    jsonWr.addParameter("loss function", opts.lossFunction)
+    jsonWr.addParameter("optimizer", opts.optimizer)
+    jsonWr.addParameter("epochs", opts.epochs)
+    jsonWr.addParameter("batch size", opts.batchSize)
+    
+    #for i, n in enumerate(opts.neurons, 1):
+        #jsonWr.addParameter("layer %d" % (i), "blah")
+    jsonWr.write(opts.cfgJSON)
+    return
 
 def main(opts): 
 
     # Save start time (epoch seconds)
     tStart = time.time()
     Verbose("Started @ " + str(tStart), True)
+
+    # Write a JSON file with model information 
+    writeCfgFile(opts)
 
     # Do not display canvases
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
@@ -284,7 +308,8 @@ def main(opts):
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
     # Optimizer function is related to a function used to optimise the weights
     Print("Compiling the model with the loss function %s and optimizer %s " % (ls + opts.lossFunction + ns, ls + opts.optimizer + ns), True)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
+    model.compile(loss=opts.lossFunction, optimizer=opts.optimizer, metrics=['acc'])
+    #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
@@ -327,7 +352,7 @@ def main(opts):
 
     # Pick events with output = 1
     Print("Select events/samples which have an output variable Y (last column) equal to 1 (i.e. prediction is combatible with signal)", True)
-    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs] #iro - fixme - understand
+    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs]
     x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
 
     Print("Select events/samples which have an output variable Y (last column) equal to 0 (i.e. prediction is NOT combatible with signal)", False)
@@ -339,22 +364,27 @@ def main(opts):
     pred_train_B =  model.predict(x_train_B, batch_size=None, verbose=1, steps=None)
     pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
     pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
-
+    
     # Plot some output
-    func.PlotOutput(pred_signal , pred_background, opts.saveDir, "Output_SB"      , 1, opts.saveFormats) #dump to json
-    # tmp - start
-    for s in pred_signal:
-        print "s = ", s[0]
-    for b in pred_background:
-        print "b = ", b[0]
-    # tmp - end
-    # iro -fixme
-    # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
+    resDict = {}
+    resDict["signal"]     = pred_signal
+    resDict["background"] = pred_background
+    gList = func.PlotAndSave(resDict, opts.saveDir, "Output_SB", opts.saveFormats) #dump to json
+    # Write to json file
+    jsonWr = JsonWriter(saveDir=saveDir, verbose=False)
+    for gr in gList:
+        jsonWr.addGraph(saveName + "_" + gr.GetName(), gr)
+    jsonWr.addParameter("scenario", "worst-case")                                                                                                                                                                         
+    jsonWr.write(opts.resultsJSON)
+
     if 0:
+        func.PlotOutput(pred_signal, pred_background, opts.saveDir, "Output_SB", 1, opts.saveFormats) #dump to json
         func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
         func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
         func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
     
+    # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
+
     # Calculate efficiency (Entries Vs Output)
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
     func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
@@ -413,6 +443,8 @@ if __name__ == "__main__":
     GRIDY        = False
     LOSSFUNCTION = 'binary_crossentropy'
     OPTIMIZER    = 'adam'
+    CFGJSON      = "config.json"
+    RESULTSJSON  = "results.json"
 
     # Define the available script options
     parser = OptionParser(usage="Usage: %prog [options]")
@@ -428,6 +460,12 @@ if __name__ == "__main__":
 
     parser.add_option("--rootFileName", dest="rootFileName", type="string", default=ROOTFILENAME, 
                       help="Input ROOT file containing the signal and backbground TTrees with the various TBrances *variables) [default: %s]" % ROOTFILENAME)
+
+    parser.add_option("--resultsJSON", dest="resultsJSON", default=RESULTSJSON,
+                      help="JSON file containing the results [default: %s]" % (RESULTSJSON))
+
+    parser.add_option("--cfgJSON", dest="cfgJSON", default=CFGJSON,
+                      help="JSON file containing the configurations [default: %s]" % (CFGJSON))
 
     parser.add_option("--saveDir", dest="saveDir", type="string", default=SAVEDIR,
                       help="Directory where all pltos will be saved [default: %s]" % SAVEDIR)

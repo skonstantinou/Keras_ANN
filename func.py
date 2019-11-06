@@ -1,24 +1,94 @@
+
+# Import modules
+#================================================================================================   
 import ROOT
 import plot
 import math
 import array
 import json
 
-###########################################################
-# Plot Output
-###########################################################
+#================================================================================================   
+# Function definition
+#================================================================================================   
+def convertHistoToGaph(histo, verbose=False):
+                                                                                                                                                                                                            
+    # Lists for values
+    x     = []
+    y     = []
+    xerrl = []
+    xerrh = []
+    yerrl = []
+    yerrh = []
+    nBinsX = histo.GetNbinsX()
+    
+    for i in range (0, nBinsX+1):
+        # Get values
+        xVal  = histo.GetBinCenter(i)
+        xLow  = histo.GetBinWidth(i)
+        xHigh = xLow
+        yVal  = histo.GetBinContent(i)
+        yLow  = histo.GetBinError(i)
+        yHigh = yLow
+                                                                                                                                                                                                            
+        # Store values                                                                                                                                                                                      
+        x.append(xVal)
+        xerrl.append(xLow)
+        xerrh.append(xHigh)
+        y.append(yVal)
+        yerrl.append(yLow)
+        yerrh.append(yHigh)
+        
+    # Create the TGraph with asymmetric errors                                                                                                                                                              
+    tgraph = ROOT.TGraphAsymmErrors(len(x),
+                                    array.array("d",x),
+                                    array.array("d",y),
+                                    array.array("d",xerrl),
+                                    array.array("d",xerrh),
+                                    array.array("d",yerrl),
+                                    array.array("d",yerrh))
+    if verbose:
+        tgraph.GetXaxis().SetLimits(0.0, 1.0)
+    tgraph.SetName(histo.GetName())
 
+    # Construct info table (debugging)
+    table  = []
+    align  = "{0:>6} {1:^10} {2:>10} {3:>10} {4:>10} {5:^3} {6:<10}"
+    header = align.format("#", "x-", "x", "x+", "y", "+/-", "Error")
+    hLine  = "="*70
+    table.append("")
+    table.append(hLine)
+    table.append("{0:^70}".format(histo.GetName()))
+    table.append(header)
+    table.append(hLine)
+                                                                                                                                                                                                            
+    # For-loop: All values x-y and their errors
+    for i, xV in enumerate(x, 0):
+        row = align.format(i+1, "%.4f" % xerrl[i], "%.4f" %  x[i], "%.4f" %  xerrh[i], "%.5f" %  y[i], "+/-", "%.5f" %  yerrh[i])
+        table.append(row)
+    table.append(hLine)
+                                                                                                                                                                                                            
+    if 0:
+        for i, line in enumerate(table, 1):
+            print line
+    return tgraph                              
+        
 def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
     
     ROOT.gStyle.SetOptStat(0)
+
+    # Create canvas
     canvas = plot.CreateCanvas()
     canvas.cd()
     canvas.SetLogy()
-    h1=ROOT.TH1F('train', '', 50, 0.0, 1.)
+
+    # Create histograms
+    h1 = ROOT.TH1F('train', '', 50, 0.0, 1.0)
+    h2 = ROOT.TH1F('test' , '', 50, 0.0, 1.0)
+
+    # Fill histograms
     for r in Y_train:
         h1.Fill(r)
 
-    h2=ROOT.TH1F('test', '', 50, 0.0, 1.)
     for r in Y_test:
         h2.Fill(r)
 
@@ -37,10 +107,12 @@ def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
         h.GetXaxis().SetTitle("Output")
         h.GetYaxis().SetTitle("Entries")
         h.Draw("HIST SAME")
-
+    
+    # What is this for? Ask soti
     graph = plot.CreateGraph([0.5, 0.5], [0, ymax*1.1])
     graph.Draw("same")
     
+    # Create legend
     leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
     if isSB:
         leg.AddEntry(h1, "signal","l")
@@ -48,16 +120,69 @@ def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
     else:
         leg.AddEntry(h1, "train","l")
         leg.AddEntry(h2, "test","l")
-
     leg.Draw()
 
     plot.SavePlot(canvas, saveDir, saveName, saveFormats)
     canvas.Close()
     return
+        
+def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
 
-###########################################################
-# Canculate Efficiency
-###########################################################
+    # Create canvas
+    ROOT.gStyle.SetOptStat(0)
+    canvas = plot.CreateCanvas()
+    canvas.cd()
+
+    hList = []
+    gList = []
+    yMin  = 100000
+    yMax  = -1
+    for i, key in enumerate(resDict.keys(), 0):
+        h = ROOT.TH1F(key, '', 50, 0.0, 1.0) 
+        for x in resDict[key]:
+            h.Fill(x)
+            yMin = min(x[0], yMin)        
+            # print "%d) yMin = %s, x = %s, type(x) = %s" % (i, yMin, x[0], type(x[0]))
+        if 0:
+            h.Scale(1./h.Integral())
+        # Save maximum
+        yMax = max(h.GetMaximum(), yMax)
+
+        # Customise & append to list
+        plot.ApplyStyle(h, i+1)
+        hList.append(h)
+
+    if yMin <= 0.0:
+        yMin = 100
+    canvas.SetLogy()
+
+    # For-loop: All histograms
+    for i, h in enumerate(hList, 0):
+        h.SetMinimum(yMin*0.85)        
+        h.SetMaximum(yMax*1.15)
+        h.GetXaxis().SetTitle("Output")
+        h.GetYaxis().SetTitle("Entries")
+        if i==0:
+            h.Draw("HIST")
+        else:
+            h.Draw("HIST SAME")
+    # What is this for? Ask soti
+    graph = plot.CreateGraph([0.5, 0.5], [0, yMax*1.1])
+    graph.Draw("same")
+    
+    # Create legend
+    leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
+    for h in hList:
+        leg.AddEntry(h, h.GetName(),"l")
+    leg.Draw()
+
+    plot.SavePlot(canvas, saveDir, saveName, saveFormats)
+    canvas.Close()
+
+    # Create TGraph
+    for h in hList:
+        gList.append(convertHistoToGaph(h))
+    return gList
 
 def CalcEfficiency(htest_s, htest_b):
     nbins = htest_s.GetNbinsX()
@@ -86,10 +211,6 @@ def CalcEfficiency(htest_s, htest_b):
         xvalue.append(htest_s.GetBinCenter(i))
     return xvalue, eff_s, eff_b, error
 
-###########################################################
-# Canculate Significance
-###########################################################
-    
 def CalcSignificance(htest_s, htest_b):
     nbins = htest_s.GetNbinsX()
     h_signif0=ROOT.TH1F('signif0', '', nbins, 0.0, 1.)
@@ -108,10 +229,6 @@ def CalcSignificance(htest_s, htest_b):
         h_signif0.Fill(htest_s.GetBinCenter(i), _sign0)        
         h_signif1.Fill(htest_s.GetBinCenter(i), _sign1)        
     return h_signif0, h_signif1
-
-###########################################################
-# Plot Efficiency
-###########################################################
 
 def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     ROOT.gStyle.SetOptStat(0)
@@ -185,22 +302,19 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     canvas.Close()
     return
 
-###########################################################
-# Get ROC curve (signal efficiency vs bkg efficiency)
-###########################################################
-
 def GetROC(htest_s, htest_b):
+    '''
+    Get ROC curve (signal efficiency vs bkg efficiency)
+    '''
     # Calculate signal and background efficiency vs output
     xvalue, eff_s, eff_b, error = CalcEfficiency(htest_s, htest_b)
     graph_roc = plot.GetGraph(eff_s, eff_b, error, error, error, error)
     return graph_roc
 
-###########################################################
-# Plot ROC curves (signal efficiency vs bkg efficiency)
-###########################################################
-
 def PlotROC(graphMap, saveDir, saveName, saveFormats):
-
+    '''
+    Plot ROC curves (signal efficiency vs bkg efficiency)
+    '''
     ROOT.gStyle.SetOptStat(0)
     canvas = plot.CreateCanvas()
     canvas.cd()
@@ -223,13 +337,7 @@ def PlotROC(graphMap, saveDir, saveName, saveFormats):
     
     plot.SavePlot(canvas, saveDir, saveName, saveFormats)
     canvas.Close()
-
     return
-
-
-###########################################################
-# Plot Overtraining test
-###########################################################
 
 def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, saveName, saveFormats):
     def ApplyStyle(histo):
@@ -315,13 +423,11 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     plot.SavePlot(canvas, saveDir, saveName, saveFormats)
     canvas.Close()
     return htrain_s1, htest_s1, htrain_b1, htest_b1
-    
-    
-###########################################################
-# Write model weights and architecture in txt file
-###########################################################
-
+            
 def WriteModel(model, model_json, output):
+    '''
+    Write model weights and architecture in txt file
+    '''
     arch = json.loads(model_json)
     with open(output, 'w') as fout:
         fout.write('layers ' + str(len(model.layers)) + '\n')
