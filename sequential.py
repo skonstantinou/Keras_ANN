@@ -32,6 +32,7 @@ EXAMPLES:
 ./sequential.py --test --activation relu -s png,pdf,root,C
 ./sequential.py --test --activation relu,relu,sigmoid --neurons 36,19,1 -s pdf
 ./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
+./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 100 --batchSize 500 -s pdf --saveDir Test
 
 
 LAST USED:
@@ -44,6 +45,7 @@ https://github.com/attikis/Keras_ANN
 
 
 URL:
+https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw <----- Really good
 https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
 https://keras.io/activations/
 https://keras.io/getting-started/
@@ -78,6 +80,7 @@ from sklearn.externals import joblib
 import plot
 import func
 import tdrstyle
+from jsonWriter import JsonWriter 
 
 import sys
 import time
@@ -118,12 +121,34 @@ def Verbose(msg, printHeader=True, verbose=False):
     Print(msg, printHeader)
     return
 
+def writeCfgFile(opts):
+
+    # Write to json file
+    jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
+
+    jsonWr.addParameter("model", "sequential")
+    jsonWr.addParameter("layers", len(opts.neurons))
+    jsonWr.addParameter("hidden layers", len(opts.neurons)-2)
+    jsonWr.addParameter("activation functions", [a for a in opts.activation])
+    jsonWr.addParameter("neurons", [n for n in opts.neurons])
+    jsonWr.addParameter("loss function", opts.lossFunction)
+    jsonWr.addParameter("optimizer", opts.optimizer)
+    jsonWr.addParameter("epochs", opts.epochs)
+    jsonWr.addParameter("batch size", opts.batchSize)
+    
+    #for i, n in enumerate(opts.neurons, 1):
+        #jsonWr.addParameter("layer %d" % (i), "blah")
+    jsonWr.write(opts.cfgJSON)
+    return
 
 def main(opts): 
 
     # Save start time (epoch seconds)
     tStart = time.time()
     Verbose("Started @ " + str(tStart), True)
+
+    # Write a JSON file with model information 
+    writeCfgFile(opts)
 
     # Do not display canvases
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
@@ -244,11 +269,14 @@ def main(opts):
             layer += " (input Layer)" # Input variables, sometimes called the visible layer.
         elif iLayer == len(opts.neurons)-1:
             layer += " (output Layer)" # Layers of nodes between the input and output layers. There may be one or more of these layers.
-        else:
+        else:            
             layer += " (hidden layer)" # A layer of nodes that produce the output variables.
             
         Print("Adding %s, with %s%d neurons%s and activation function %s" % (ts + layer + ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
         if iLayer == 0:
+            if opts.neurons[iLayer] != nInputs > 1:
+                msg = "The number of neurons must equal the number of features (colimns) in your data. Some NN configuration add one additional node for a bias term"
+                Print(msg, True)
             model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
             #model.add(Activation('softmax'))
         else:
@@ -284,7 +312,8 @@ def main(opts):
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
     # Optimizer function is related to a function used to optimise the weights
     Print("Compiling the model with the loss function %s and optimizer %s " % (ls + opts.lossFunction + ns, ls + opts.optimizer + ns), True)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
+    model.compile(loss=opts.lossFunction, optimizer=opts.optimizer, metrics=['acc'])
+    #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
@@ -307,7 +336,7 @@ def main(opts):
         model_json = model.to_json()
         with open("model_architecture.json", "w") as json_file:
             json_file.write(model_json)
-
+        
         # serialize weights to HDF5
         model.save_weights('model_weights.h5', overwrite=True)
         model.save(modelName)
@@ -327,7 +356,7 @@ def main(opts):
 
     # Pick events with output = 1
     Print("Select events/samples which have an output variable Y (last column) equal to 1 (i.e. prediction is combatible with signal)", True)
-    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs] #iro - fixme - understand
+    x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs]
     x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
 
     Print("Select events/samples which have an output variable Y (last column) equal to 0 (i.e. prediction is NOT combatible with signal)", False)
@@ -339,14 +368,28 @@ def main(opts):
     pred_train_B =  model.predict(x_train_B, batch_size=None, verbose=1, steps=None)
     pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
     pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
-
+    
     # Plot some output
-    func.PlotOutput(pred_signal , pred_background, opts.saveDir, "Output_SB"      , 1, opts.saveFormats) #dump to json
+    resDict = {}
+    resDict["signal"]     = pred_signal
+    resDict["background"] = pred_background
+    gList = func.PlotAndGetGraphList(resDict, opts.saveDir, "Output_SB", opts.saveFormats) #dump to json
+    # Write to json file
+    jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
+    for gr in gList:
+        jsonWr.addGraph("Output_SB" + "_" + gr.GetName(), gr)
+    #jsonWr.addParameter("scenario", "worst-case")                                                                                                                                                                         
+    # Only write results in the resultsJSON file!
+    jsonWr.write(opts.resultsJSON)
+
     if 0:
+        func.PlotOutput(pred_signal, pred_background, opts.saveDir, "Output_SB", 1, opts.saveFormats) #dump to json
         func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
         func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
         func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
     
+    # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
+
     # Calculate efficiency (Entries Vs Output)
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
     func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
@@ -405,6 +448,8 @@ if __name__ == "__main__":
     GRIDY        = False
     LOSSFUNCTION = 'binary_crossentropy'
     OPTIMIZER    = 'adam'
+    CFGJSON      = "config.json"
+    RESULTSJSON  = "results.json"
 
     # Define the available script options
     parser = OptionParser(usage="Usage: %prog [options]")
@@ -420,6 +465,12 @@ if __name__ == "__main__":
 
     parser.add_option("--rootFileName", dest="rootFileName", type="string", default=ROOTFILENAME, 
                       help="Input ROOT file containing the signal and backbground TTrees with the various TBrances *variables) [default: %s]" % ROOTFILENAME)
+
+    parser.add_option("--resultsJSON", dest="resultsJSON", default=RESULTSJSON,
+                      help="JSON file containing the results [default: %s]" % (RESULTSJSON))
+
+    parser.add_option("--cfgJSON", dest="cfgJSON", default=CFGJSON,
+                      help="JSON file containing the configurations [default: %s]" % (CFGJSON))
 
     parser.add_option("--saveDir", dest="saveDir", type="string", default=SAVEDIR,
                       help="Directory where all pltos will be saved [default: %s]" % SAVEDIR)
@@ -583,7 +634,20 @@ if __name__ == "__main__":
     if opts.optimizer not in optList:
         msg = "Unsupported loss function %s. Please select on of the following:%s\n\t%s" % (opts.optimizer, ss, "\n\t".join(optList))
         raise Exception(es + msg + ns)    
-    
+
+    # Determine number of layers
+    opts.nLayers = len(opts.neurons)
+    opts.nHiddenLayers = len(opts.neurons)-2
+    # Sanity check
+    if opts.nHiddenLayers < 1:
+        msg = "The NN has %d hidden layers. It must have at least 1 hidden layer" % (opts.nHiddenLayers)
+        raise Exception(es + msg + ns)    
+    else:
+        msg = "The NN has %s%d hidden layers%s (in addition to input and output layers)." % (hs, opts.nHiddenLayers, ns)
+        Print(msg, True) 
+        msg = "[NOTE: One hidden layer is sufficient for the large majority of problems. In general, the optimal size of the hidden layer is usually between the size of the input and size of the output layers.]"
+        Print(msg, False)         
+
     # Call the main function
     Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
     main(opts)
