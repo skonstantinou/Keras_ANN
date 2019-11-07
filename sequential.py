@@ -11,6 +11,10 @@ Keras is a modular, powerful and intuitive open-source Deep Learning library bui
 7. Make Predictions
 
 
+ENV SETUP:
+cd ~/scratch0/CMSSW_10_2_11/src/ && cmsenv && setenv SCRAM_ARCH slc7_amd64_gcc700 && cd /afs/cern.ch/user/a/attikis/workspace/Keras_ANN/
+
+
 OPTIMISATION:
 Basically it is just trial and error. The number of layers and the number of nodes in Keras (aka "hyperparameters") should be tuned on a validation set (split from your original data into train/validation/test).
 Tuning just means trying different combinations of parameters and keep the one with the lowest loss value or better accuracy on the validation set, depending on the problem.
@@ -77,6 +81,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.externals import joblib
 
+import subprocess
 import plot
 import func
 import tdrstyle
@@ -126,6 +131,9 @@ def writeCfgFile(opts):
     # Write to json file
     jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
 
+    jsonWr.addParameter("keras version", opts.keras)
+    jsonWr.addParameter("host name", opts.hostname)
+    jsonWr.addParameter("python version", opts.python)
     jsonWr.addParameter("model", "sequential")
     jsonWr.addParameter("layers", len(opts.neurons))
     jsonWr.addParameter("hidden layers", len(opts.neurons)-2)
@@ -141,6 +149,22 @@ def writeCfgFile(opts):
     jsonWr.write(opts.cfgJSON)
     return
 
+def writeGitFile(opts):
+
+    # Write to json file
+    path  = os.path.join(opts.saveDir, "gitBranch.txt")
+    gFile = open(path, 'w')
+    gFile.write(opts.gitBranch)
+
+    path  = os.path.join(opts.saveDir, "gitStatus.txt")
+    gFile = open(path, 'w')
+    gFile.write(opts.gitStatus)
+
+    path  = os.path.join(opts.saveDir, "gitDiff.txt")
+    gFile = open(path, 'w')
+    gFile.write(opts.gitDiff)
+    return
+
 def main(opts): 
 
     # Save start time (epoch seconds)
@@ -149,6 +173,7 @@ def main(opts):
 
     # Write a JSON file with model information 
     writeCfgFile(opts)
+    writeGitFile(opts)
 
     # Do not display canvases
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
@@ -292,13 +317,17 @@ def main(opts):
             if opts.neurons[iLayer] != nInputs > 1:
                 msg = "The number of neurons must equal the number of features (colimns) in your data. Some NN configuration add one additional node for a bias term"
                 Print(msg, True)
-            model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
-            #model.add(Activation('softmax'))
+            # Only first layer demands input_dim. For the rest it is implied.
+            model.add( Dense(opts.neurons[iLayer], input_dim = nInputs) )
+            model.add(Activation(opts.activation[iLayer]))
+            #model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # her majerty Soti requested to break this into 2 lines
         else:
             if 0: #opts.neurons[iLayer] < nInputs:
                 msg = "The number of  neurons (=%d) is less than the number of input variables (=%d). Please set the number of neurons to be at least the number of inputs!" % (opts.neurons[iLayer], nInputs)
                 raise Exception(es + msg + ns)  
-            model.add( Dense(opts.neurons[iLayer], activation = opts.activation[iLayer]) ) # only first layer demands input_dim. For the rest it is implied.
+            model.add( Dense(opts.neurons[iLayer]))
+            model.add(Activation(opts.activation[iLayer]))
+            #model.add( Dense(opts.neurons[iLayer], activation = opts.activation[iLayer]) ) 
 
     # Print a summary representation of your model. 
     Print("Printing model summary:", True)
@@ -357,7 +386,7 @@ def main(opts):
         model.save(modelName)
         
         # write weights and architecture in txt file
-        func.WriteModel(model, model_json, "model.txt")
+        func.WriteModel(model, model_json, os.path.join(opts.saveDir, "model.txt") )
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
     Print("Generating output predictions for the input samples", True) # (e.g. Numpy array)
@@ -400,6 +429,9 @@ def main(opts):
     # Only write results in the resultsJSON file!
     jsonWr.write(opts.resultsJSON)
 
+    #func.PlotOutput(dset_signal[0], dset_background[0], opts.saveDir, "Test_SB", 1, opts.saveFormats) #dump to json
+
+
     if 0:
         func.PlotOutput(pred_signal, pred_background, opts.saveDir, "Output_SB", 1, opts.saveFormats) #dump to json
         func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
@@ -421,11 +453,6 @@ def main(opts):
     secs    = mins[1]               # seconds
     Print("Total elapsed time is %s days, %s hours, %s mins, %s secs" % (days[0], hours[0], mins[0], secs), True)
     
-    # Copy logfile to results directory
-    if opts.log:
-        logPath = os.path.join(opts.saveDir, opts.logFile)
-        os.system("mv %s %s" % (opts.logFile, logPath))
-        Print("Log file %s moved to %s" % (ls + opts.logFile + ns, ts + logPath + ns), True)
     return 
 
 #================================================================================================ 
@@ -591,25 +618,28 @@ if __name__ == "__main__":
 
     # Determine logFile name
     opts.logFile = sName + ".log"
+    opts.logPath = os.path.join(opts.saveDir, opts.logFile)    
 
     # Determine path for saving plots
     if opts.saveDir == None:
         usrName = getpass.getuser()
         usrInit = usrName[0]
-        myDir   = "tmp"
+        myDir   = ""
         if "lxplus" in socket.gethostname():
             myDir = "/afs/cern.ch/user/%s/%s/public/html/" % (usrInit, usrName)
         else:
             myDir = os.path.join(os.getcwd())
         opts.saveDir = os.path.join(myDir, sName)
     else:
-        pass
+        if not os.path.exists(opts.saveDir):
+            os.mkdir(opts.saveDir)
 
     # Create logfile
     bak_stdout = sys.stdout
-    log_file = open(opts.logFile, 'w')
+    log_file   = None
     if opts.log:
         # Keep a copy of the original "stdout"
+        log_file   = open(opts.logPath, 'w')
         sys.stdout = log_file
         Print("Log file %s created" % (ls + opts.logFile + ns), True)
 
@@ -666,8 +696,16 @@ if __name__ == "__main__":
         msg = "[NOTE: One hidden layer is sufficient for the large majority of problems. In general, the optimal size of the hidden layer is usually between the size of the input and size of the output layers.]"
         Print(msg, False)         
 
+    # Get some basic information
+    opts.keras     = keras.__version__
+    opts.hostname  = socket.gethostname()
+    opts.python    = "%d.%d.%d" % (sys.version_info[0], sys.version_info[1], sys.version_info[2])
+    opts.gitBranch = subprocess.check_output(["git", "branch", "-a"])
+    opts.gitStatus = subprocess.check_output(["git", "status"])
+    opts.gitDiff   = subprocess.check_output(["git", "diff"])
+
     # Call the main function
-    Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
+    Print("Using Keras %s (hostname = %s)" % (ss + opts.keras + ns, ls + opts.hostname + ns), True)
     main(opts)
 
     Print("All output saved under directory %s" % (ls + opts.saveDir + ns), True)
