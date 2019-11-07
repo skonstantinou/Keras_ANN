@@ -44,7 +44,7 @@ seed     = 1234
 nepochs  = 5000
 nbatch   = 500
 
-if 1:
+if 0:
     nepochs = 10
     nbatch = 5000
 
@@ -170,6 +170,9 @@ if not debug:
     model.save_weights('model_weights.h5', overwrite=True)
     model.save(modelName)
     
+    # write weights and architecture in txt file
+    func.WriteModel(model, model_json, "model_test.txt")
+
 pred_train = model.predict(X_train)
 pred_test = model.predict(X_test)
 pred_signal = model.predict(X_signal)
@@ -192,17 +195,17 @@ dirName = plot.getDirName("TopTag")
 X_signal     = dset_signal[:nsignal, 0:nInputs]
 X_background = dset_background[:nsignal, 0:nInputs]
 
-func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB.pdf", 1, "pdf")
-func.PlotOutput(pred_train, pred_test, dirName, "Output_pred.pdf", 0, "pdf")
-func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train.pdf", 1, "pdf")
-func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test.pdf", 1, "pdf")
+func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB", 1, ["pdf"])
+func.PlotOutput(pred_train, pred_test, dirName, "Output_pred", 0, ["pdf"])
+func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train", 1, ["pdf"])
+func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test", 1, ["pdf"])
 
 # Calculate efficiency
-htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest.pdf", "pdf")
-func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf", "pdf")
+htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest", ["pdf"])
+func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf", ["pdf"])
 
 graph1 = func.GetROC(htest_s, htest_b)
 graph2 = func.GetROC(htest_b, htest_s)
 
 graph_roc = {"graph" : [graph1, graph2], "name" : ["graph 1", "graph 2"]}
-func.PlotROC(graph_roc, dirName, "ROC.pdf", "pdf")
+func.PlotROC(graph_roc, dirName, "ROC", ["pdf"])

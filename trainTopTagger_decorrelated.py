@@ -40,7 +40,7 @@ K.set_session(session)
 
 #Default values:
 LAMBDA       = 1
-NEPOCHS      = 200
+NEPOCHS      = 1000
 OPTIMIZER    = "SGD"
 GRIDX        = False
 GRIDY        = False
@@ -74,46 +74,54 @@ def PlotLossFunction(losses, nepochs, saveDir):
         h.SetLineColor(color)
         h.SetMarkerColor(color)
         h.SetMarkerStyle(8)
-        h.SetMarkerSize(0.8)
+        h.SetMarkerSize(0.6)
         h.SetMaximum(ymax)
         h.SetMinimum(ymin)
         h.GetXaxis().SetTitle("# epoch")
         h.GetYaxis().SetTitle("Loss")
 
     ROOT.gStyle.SetOptStat(0)
-    canvas = ROOT.TCanvas("canvas", "canvas",0,0,800,800)
+    canvas = ROOT.TCanvas()
     canvas.cd()
+    leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
+
     xarr = []
     for i in range(1, nepochs+1):
         xarr.append(i)
 
-    hLf  = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_f"]))
-    hLr  = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_r"]))
-    hLfr = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_f - L_r"]))
 
-    ymax = max(hLf.GetHistogram().GetMaximum(), hLr.GetHistogram().GetMaximum(), hLfr.GetHistogram().GetMaximum())
-    ymin = min(hLf.GetHistogram().GetMinimum(), hLr.GetHistogram().GetMinimum(), hLfr.GetHistogram().GetMinimum())
-    ymax = ymax + 1
-    ymin = ymin - 1
+    if (opt.lam > 0):
+        hLf  = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_f"]))
+        hLr  = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_r"]))
+        hLfr = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["L_f - L_r"]))
 
-    
-    ApplyStyle(hLf, ymin, ymax, ROOT.kRed)
-    ApplyStyle(hLr, ymin, ymax, ROOT.kBlue)
-    ApplyStyle(hLfr, ymin, ymax, ROOT.kGreen+1)
-    
-    hLf.Draw("pa")
-    hLr.Draw("p same")
-    hLfr.Draw("p same")
+        ymax = max(hLf.GetHistogram().GetMaximum(), hLr.GetHistogram().GetMaximum(), hLfr.GetHistogram().GetMaximum())
+        ymin = min(hLf.GetHistogram().GetMinimum(), hLr.GetHistogram().GetMinimum(), hLfr.GetHistogram().GetMinimum())
+        ymax = ymax + 1
+        ymin = ymin - 1
+                
+        ApplyStyle(hLf, ymin, ymax, ROOT.kRed)
+        ApplyStyle(hLr, ymin, ymax, ROOT.kBlue)
+        ApplyStyle(hLfr, ymin, ymax, ROOT.kGreen+1)
+        
+        hLf.Draw("pa")
+        hLr.Draw("p same")
+        hLfr.Draw("p same")
+        
+        leg.AddEntry(hLf, "L_{f}","ple")
+        leg.AddEntry(hLr,"L_{r}","ple")
+        leg.AddEntry(hLfr,"L_{f} - L_{r}","ple")
 
-    leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
-    leg.AddEntry(hLf, "L_{f}","ple")
-    leg.AddEntry(hLr,"L_{r}","ple")
-    leg.AddEntry(hLfr,"L_{f} - #lambda L_{r}","ple")
+    else:
+        h_loss = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["loss"]))
+        ymax = h_loss.GetHistogram().GetMaximum()
+        ymin = h_loss.GetHistogram().GetMinimum()
+        ApplyStyle(h_loss, ymin, ymax,  ROOT.kGreen +1)
+        h_loss.Draw("pa")
+        leg.AddEntry(h_loss, "L_{f}","ple")
+
     leg.Draw()
-
-    #canvas.SetLogy()
-
-    saveName = "Loss_lam%s_opt%s.pdf" %(opt.lam, opt.opt)#str(opt.lr).replace(".","p"))
+    saveName = "Loss_lam%s_opt%s" %(opt.lam, opt.opt)
     plot.SavePlot(canvas, saveDir, saveName)
     canvas.Close()
     return
@@ -131,8 +139,8 @@ def getInputs():
     inputList.append("TrijetSubldgJetBDisc")
     inputList.append("TrijetBJetLdgJetMass")
     inputList.append("TrijetBJetSubldgJetMass")
-    #inputList.append("TrijetMass")
-    #inputList.append("TrijetDijetMass")
+    inputList.append("TrijetMass")
+    inputList.append("TrijetDijetMass")
     inputList.append("TrijetBJetBDisc")
     inputList.append("TrijetSoftDrop_n2")
     inputList.append("TrijetLdgJetCvsL")
@@ -165,10 +173,8 @@ def getClassifier(model_clf, nInputs):
 # Get Regressor
 ###########################################################
 
-#def getRegressor(model_reg,nInputs):    
 def getRegressor(model_clf,model_reg):    
     print nInputs
-    #model_reg = getClassifier(model_reg, nInputs)
     model_reg.add(model_clf)
     model_reg.add(Dense(16))
     model_reg.add(Activation("relu"))
@@ -279,6 +285,9 @@ X_background = dset_background[:nsignal, 0:nInputs]
 dataset = pandas.concat([df_signal, df_background]).values
 dataset_target_all = pandas.concat([signal.pandas.df(["TrijetMass"]), background.pandas.df(["TrijetMass"])]).values
 
+earlystop = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=100)
+callbacks_list = [earlystop]
+
 #Split data into input (X) and output (Y)
 X = dataset[:2*nsignal,0:nInputs]
 Y = dataset[:2*nsignal,nInputs:]
@@ -356,7 +365,7 @@ make_trainable(model_reg, False)
 make_trainable(model_clf, True)
 
 print "=== Classifier: Fit"
-model_clf.fit(X_train, Y_train, epochs=10)
+model_clf.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=10)
 
 ###################################################
 # Pretrain  Regressor
@@ -366,7 +375,7 @@ make_trainable(model_reg, True)
 make_trainable(model_clf, False)
 
 print "=== Adversarial Network: Fit"
-model_adv.fit(X_train, target_train, epochs=10)
+model_adv.fit(X_train, target_train, validation_data=(X_test, target_test), epochs=10)
 
 ###################################################
 # Train the model
@@ -374,29 +383,35 @@ model_adv.fit(X_train, target_train, epochs=10)
 
 losses = {"L_f": [], "L_r": [], "L_f - L_r": []}
 
-batch_size = 128
+batch_size = 1000 #128
 
-for i in range(nepochs): #201
-    l = model_comb.evaluate(X_test, [Y_test, target_test], verbose=1)
-    lf = l[1][None][0]
-    lr = -l[2][None][0]
-    lfr = l[0][None][0]
-    losses["L_f - L_r"].append(lfr)
-    losses["L_f"].append(lf)
-    losses["L_r"].append(lr)
-    print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, lfr)
-    
-    # Fit Classifier (with updated weights) to minimize joint loss function
-    make_trainable(model_reg, False)
-    make_trainable(model_clf, True)
-    indices = numpy.random.permutation(len(X_train))[:batch_size]
-    model_comb.train_on_batch(X_train[indices], [Y_train[indices], target_train[indices]])
+if (lam > 0):
+    for i in range(nepochs): #201
+        l = model_comb.evaluate(X_test, [Y_test, target_test], verbose=1)
+        lf = l[1][None][0]
+        lr = -l[2][None][0]
+        lfr = l[0][None][0]
+        losses["L_f - L_r"].append(lfr)
+        losses["L_f"].append(lf)
+        losses["L_r"].append(lr)
+        print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, lfr)
         
-    # Fit Regressor (with updated weights) to minimize Lr
-    make_trainable(model_reg, True)
-    make_trainable(model_clf, False)
-    model_adv.fit(X_train, target_train, batch_size=batch_size, epochs=1, verbose=0)
-
+        # Fit Classifier (with updated weights) to minimize joint loss function
+        make_trainable(model_reg, False)
+        make_trainable(model_clf, True)
+        indices = numpy.random.permutation(len(X_train))[:batch_size]
+        # Train on batch
+        model_comb.train_on_batch(X_train[indices], [Y_train[indices], target_train[indices]])
+        # Test on batch
+        model_comb.test_on_batch(X_test[indices], [Y_test[indices], target_test[indices]])
+        
+        # Fit Regressor (with updated weights) to minimize Lr
+        make_trainable(model_reg, True)
+        make_trainable(model_clf, False)
+        model_adv.fit(X_train, target_train, validation_data=(X_test, target_test), batch_size=batch_size, epochs=1, callbacks=callbacks_list, verbose=1)
+else:
+    make_trainable(model_clf, True)
+    hist = model_clf.fit(X_train, Y_train, validation_data=(X_test, Y_test), batch_size=batch_size, epochs=nepochs, callbacks=callbacks_list, verbose=1)
 ###################################################
 # Test classifier's performance
 ###################################################
@@ -408,12 +423,38 @@ for i in range(50):
     print("Predicted=%s (%s) (%s)"% (target_test[i], y_pred[i], Y_test[i]))
 
 ###################################################
-# Plot Loss function vs # epoch
+# Calculate output
+###################################################
+XY_train     = numpy.concatenate((X_train, Y_train), axis=1)
+XY_test      = numpy.concatenate((X_test, Y_test), axis=1)
+
+x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs]
+x_train_B = XY_train[XY_train[:,nInputs] == 0]; x_train_B = x_train_B[:,0:nInputs]
+x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
+x_test_B  = XY_test[XY_test[:,nInputs] == 0];   x_test_B  = x_test_B[:,0:nInputs]
+
+pred_train_S =  model_clf.predict(x_train_S)
+pred_train_B =  model_clf.predict(x_train_B)
+pred_test_S  =  model_clf.predict(x_test_S)
+pred_test_B  =  model_clf.predict(x_test_B)
+
+###################################################
+# Plot results:
 ###################################################
 
 saveDir = plot.getDirName("TopTag")
-PlotLossFunction(losses, nepochs, saveDir)
+# === Loss function vs # epoch
+if (lam > 0):
+    last_epoch = len(losses["L_f - L_r"])
+    PlotLossFunction(losses, last_epoch, saveDir)
+else:
+    last_epoch = earlystop.stopped_epoch
+    PlotLossFunction(hist.history, last_epoch, saveDir)
 
+# === Overtraining test
+htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, saveDir, "OvertrainingTest_lam%s" % lam, ["pdf"])
+# === Efficiency
+func.PlotEfficiency(htest_s, htest_b, saveDir, "Efficiency_lam%s" % lam, ["pdf"])
 ###################################################
 # Classifier: save model
 ###################################################

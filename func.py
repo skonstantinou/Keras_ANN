@@ -223,8 +223,11 @@ def CalcSignificance(htest_s, htest_b):
         # Get selected events                                                                                                                                                                       
         sSel = htest_s.IntegralAndError(i, nbins+1, sigmaSel_s, "")
         bSel = htest_b.IntegralAndError(i, nbins+1, sigmaSel_b, "")
-        # Calculate Significance                                                                                                                                                                    
-        _sign0 = sSel/math.sqrt(sSel+bSel)
+        # Calculate Significance
+        _sign0 = 0
+        if (sSel+bSel > 0):
+            _sign0 = sSel/math.sqrt(sSel+bSel)
+
         _sign1 = 2*(math.sqrt(sSel+bSel) - math.sqrt(bSel))
         h_signif0.Fill(htest_s.GetBinCenter(i), _sign0)        
         h_signif1.Fill(htest_s.GetBinCenter(i), _sign1)        
@@ -276,6 +279,9 @@ def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     h_signifScaled1.Draw("HIST SAME")
     graph_s.Draw("PL SAME")
     graph_b.Draw("PL SAME")
+
+    graph = plot.CreateGraph([0.5, 0.5], [0, ymax*1.1])
+    graph.Draw("same")
 
     #Legend
     leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
@@ -395,25 +401,26 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
             
     for i in range(len(DataList)):
         for r in DataList[i]:
-            hList[i].Fill(r)        
-        ymax = max(ymax, hList[i].GetMaximum())
-    
+            hList[i].Fill(r)            
+
     htrain_s1 = htrain_s.Clone("train_s")
     htrain_b1 = htrain_b.Clone("train_b")
     htest_s1  = htest_s.Clone("test_s")
     htest_b1  = htest_b.Clone("test_b")
 
     drawStyle = "HIST SAME"
-    leg=plot.CreateLegend(0.55, 0.18, 0.85, 0.38)
-    for h in hList:
-        h.SetMaximum(ymax*2)        
+    leg=plot.CreateLegend(0.55, 0.68, 0.85, 0.88)
 
+    for h in hList:
         h.Rebin(10)
         # Legend
         legText, legStyle = GetLegendStyle(h.GetName())
         leg.AddEntry(h, legText, legStyle)
-        
         ApplyStyle(h)
+
+    ymax = max (htrain_s.GetMaximum(), htest_s.GetMaximum(), htrain_b.GetMaximum(), htest_b.GetMaximum())
+    for h in hList:
+        h.SetMaximum(ymax*2)        
         h.Draw(DrawStyle(h.GetName())+" SAME")
 
     graph = plot.CreateGraph([0.5, 0.5], [0, ymax*2])
@@ -430,33 +437,49 @@ def WriteModel(model, model_json, output):
     '''
     arch = json.loads(model_json)
     with open(output, 'w') as fout:
-        fout.write('layers ' + str(len(model.layers)) + '\n')
+        # Store number of layers
+        fout.write( 'layers ' + str(len(model.layers)) + '\n')
         layers = []
-        for ind, l in enumerate(arch["config"]):
-            fout.write('layer ' + str(ind) + ' ' + l['class_name'] + '\n')
-            layers += [l['class_name']]
-            if l['class_name'] == 'Convolution2D':
+        
+        # Iterate over each layer
+        for index, l in enumerate(arch["config"]):
 
-                W = model.layers[ind].get_weights()[0]
+            # Store type of layer
+            fout.write(l['class_name'] + '\n')
+            #layers += [l['class_name']]
+
+            # Convolution2D layer
+            if l['class_name'] == 'Convolution2D':
+                # Get weights of layer
+                W = model.layers[index].get_weights()[0]
                 fout.write(str(W.shape[0]) + ' ' + str(W.shape[1]) + ' ' + str(W.shape[2]) + ' ' + str(W.shape[3]) + ' ' + l['config']['border_mode'] + '\n')
 
                 for i in range(W.shape[0]):
                     for j in range(W.shape[1]):
                         for k in range(W.shape[2]):
                             fout.write(str(W[i,j,k]) + '\n')
-                fout.write(str(model.layers[ind].get_weights()[1]) + '\n')
+                fout.write(str(model.layers[index].get_weights()[1]) + '\n')
 
+            # Activation layer
             if l['class_name'] == 'Activation':
+                # Store activation function
                 fout.write(l['config']['activation'] + '\n')
+
+            # MaxPooling2D layer
             if l['class_name'] == 'MaxPooling2D':
                 fout.write(str(l['config']['pool_size'][0]) + ' ' + str(l['config']['pool_size'][1]) + '\n')
+
+            # Dense layer
             if l['class_name'] == 'Dense':
-                W = model.layers[ind].get_weights()[0]
+                # Store number of inputs, outputs for each layer
+                W = model.layers[index].get_weights()[0]                
                 fout.write(str(W.shape[0]) + ' ' + str(W.shape[1]) + '\n')
-
+                
                 for w in W:
+                    # Store weights
                     fout.write(str(w) + '\n')
-                fout.write(str(model.layers[ind].get_weights()[1]) + '\n')
-
+                # Store bias values (shifts the activation function : output[i] = (Sum(weights[i,j]*inputs[j]) + bias[i]))
+                biases = model.layers[index].get_weights()[1]
+                fout.write(str(biases) + '\n')
         print 'Writing model in', output
         return
