@@ -263,10 +263,6 @@ def main(opts):
     dset_signal     = df_signal.values
     dset_background = df_background.values
 
-    # Plot input variables
-    for i, var in enumerate(inputList, 0):
-        func.PlotInputs(dset_signal[:, i:i+1], dset_background[:, i:i+1], var, "%s/%s" % (opts.saveDir, "inputs"), opts.saveFormats)
-
     Verbose("Printing 1 instance of the Numpy representation of the signal DataFrame:%s" % (ss), True)
     # For-loop: All TBranch entries
     for vList in dset_signal:
@@ -444,6 +440,10 @@ def main(opts):
         func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
     
     # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
+
+    # Plot input variables
+    for i, var in enumerate(inputList, 0):
+        func.PlotInputs(dset_signal[:, i:i+1], dset_background[:, i:i+1], var, "%s/%s" % (opts.saveDir, "inputs"), opts.saveFormats)
 
     # Calculate efficiency (Entries Vs Output)
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
