@@ -37,10 +37,12 @@ EXAMPLES:
 ./sequential.py --test --activation relu,relu,sigmoid --neurons 36,19,1 -s pdf
 ./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 36,35,19,19,1 --epochs 10000 --batchSize 50000 -s pdf
 ./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 100 --batchSize 500 -s pdf --saveDir Test
+./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 10000 --batchSize 50000 -s pdf --log
+./sequential.py --activation relu,relu,sigmoid --neurons 19,190,1 --epochs 50 --batchSize 500 -s pdf --log --saveDir ~/public/html/Test
 
 
 LAST USED:
-./sequential.py --activation relu,relu,sigmoid --neurons 36,19,1 --epochs 10000 --batchSize 50000 -s pdf --log
+./sequential.py --activation relu,relu,sigmoid --neurons 19,190,1 --epochs 50 --batchSize 500 -s pdf --saveDir ~/public/html/Test
 
 
 GITHUB:
@@ -253,7 +255,7 @@ def main(opts):
         nMin = (2*nsignal) / (10*(nIn + nOut))
         if nOut > nMax or nOut < nMin:
             msg = "The number of neurons for layer #%d (=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nMin, nMax)
-            Print(cs + msg + ns, True)
+            Print(hs + msg + ns, True)
     
     # Sanity check
     columns = list(df_signal.columns.values)
@@ -390,10 +392,10 @@ def main(opts):
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
     Print("Generating output predictions for the input samples", True) # (e.g. Numpy array)
-    pred_train      = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
-    pred_test       = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
-    pred_signal     = model.predict(X_signal    , batch_size=None, verbose=1, steps=None)
-    pred_background = model.predict(X_background, batch_size=None, verbose=1, steps=None)
+    pred_train  = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
+    pred_test   = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
+    pred_signal = model.predict(X_signal    , batch_size=None, verbose=1, steps=None)
+    pred_bkg    = model.predict(X_background, batch_size=None, verbose=1, steps=None)
     # Keras version 2.2.5 or later (https://keras.io/models/model/)
     # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
@@ -416,33 +418,38 @@ def main(opts):
     pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
     pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
     
-    # Plot some output
+    # Create json file
+    jsonWr  = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
+
+    # Plot selected output and save to JSON file for future use
     resDict = {}
     resDict["signal"]     = pred_signal
-    resDict["background"] = pred_background
-    gList = func.PlotAndGetGraphList(resDict, opts.saveDir, "Output_SB", opts.saveFormats) #dump to json
-    # Write to json file
-    jsonWr = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
-    for gr in gList:
-        jsonWr.addGraph("Output_SB" + "_" + gr.GetName(), gr)
-    #jsonWr.addParameter("scenario", "worst-case")                                                                                                                                                                         
-    # Only write results in the resultsJSON file!
+    resDict["background"] = pred_bkg
+    func.PlotAndWriteJSON(resDict, opts.saveDir, "Output", jsonWr, opts.saveFormats)
+
+    resDict = {}
+    resDict["signal"]     = pred_train
+    resDict["background"] = pred_test
+    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputPred", jsonWr, opts.saveFormats)
+
+    resDict = {}
+    resDict["signal"]     = pred_train_S
+    resDict["background"] = pred_train_B
+    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputTrain", jsonWr, opts.saveFormats)
+
+    resDict = {}
+    resDict["signal"]     = pred_test_S
+    resDict["background"] = pred_test_B
+    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputTest", jsonWr, opts.saveFormats)
+
+    # Write the  resultsJSON file!
     jsonWr.write(opts.resultsJSON)
-
-    #func.PlotOutput(dset_signal[0], dset_background[0], opts.saveDir, "Test_SB", 1, opts.saveFormats) #dump to json
-
-
-    if 0:
-        func.PlotOutput(pred_signal, pred_background, opts.saveDir, "Output_SB", 1, opts.saveFormats) #dump to json
-        func.PlotOutput(pred_train  , pred_test      , opts.saveDir, "Output_pred"    , 0, opts.saveFormats)
-        func.PlotOutput(pred_train_S, pred_train_B   , opts.saveDir, "Output_SB_train", 1, opts.saveFormats)
-        func.PlotOutput(pred_test_S , pred_test_B    , opts.saveDir, "Output_SB_test" , 1, opts.saveFormats)
-    
-    # configuration.json file (all model parameters used). also git info (git status, git branch, git diff)
 
     # Calculate efficiency (Entries Vs Output)
     htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
     func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
+    #func.PlotAndWriteJSON(resDict, opts.saveDir, "Efficiency", jsonWr, opts.saveFormats) #fixme
+
     
     # Print total time elapsed
     tFinish = time.time()
@@ -616,9 +623,6 @@ if __name__ == "__main__":
     nDate  = "%s-%s-%s_%s" % (nDay, nMonth, nYear, nTime)
     sName  = "Keras_%s_%s" % (specs, nDate)
 
-    # Determine logFile name
-    opts.logFile = sName + ".log"
-    opts.logPath = os.path.join(opts.saveDir, opts.logFile)    
 
     # Determine path for saving plots
     if opts.saveDir == None:
@@ -630,13 +634,15 @@ if __name__ == "__main__":
         else:
             myDir = os.path.join(os.getcwd())
         opts.saveDir = os.path.join(myDir, sName)
-    else:
-        if not os.path.exists(opts.saveDir):
-            os.mkdir(opts.saveDir)
+    # Create dir if it does not exist
+    if not os.path.exists(opts.saveDir):
+        os.mkdir(opts.saveDir)
 
     # Create logfile
-    bak_stdout = sys.stdout
-    log_file   = None
+    opts.logFile = sName + ".log"
+    opts.logPath = os.path.join(opts.saveDir, opts.logFile)    
+    bak_stdout   = sys.stdout
+    log_file     = None
     if opts.log:
         # Keep a copy of the original "stdout"
         log_file   = open(opts.logPath, 'w')

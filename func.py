@@ -126,7 +126,7 @@ def PlotOutput(Y_train, Y_test, saveDir, saveName, isSB, saveFormats):
     canvas.Close()
     return
         
-def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
+def PlotAndWriteJSON(resultsDict, saveDir, saveName, jsonWr, saveFormats):
 
     # Create canvas
     ROOT.gStyle.SetOptStat(0)
@@ -137,14 +137,17 @@ def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
     gList = []
     yMin  = 100000
     yMax  = -1
-    for i, key in enumerate(resDict.keys(), 0):
+
+    # For-loop: 
+    for i, key in enumerate(resultsDict.keys(), 0):
         h = ROOT.TH1F(key, '', 50, 0.0, 1.0) 
-        for x in resDict[key]:
+        for x in resultsDict[key]:
             h.Fill(x)
             yMin = min(x[0], yMin)        
-            # print "%d) yMin = %s, x = %s, type(x) = %s" % (i, yMin, x[0], type(x[0]))
+
         if 0:
             h.Scale(1./h.Integral())
+
         # Save maximum
         yMax = max(h.GetMaximum(), yMax)
 
@@ -182,7 +185,12 @@ def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
     # Create TGraph
     for h in hList:
         gList.append(convertHistoToGaph(h))
-    return gList
+
+    # Write the Tgraph into the JSON file
+    for gr in gList:
+        gName = "%s_%s" % (saveName, gr.GetName())
+        jsonWr.addGraph(gName, gr)
+    return #gList
 
 def CalcEfficiency(htest_s, htest_b):
     nbins = htest_s.GetNbinsX()
