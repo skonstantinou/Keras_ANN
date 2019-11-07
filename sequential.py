@@ -223,9 +223,9 @@ def main(opts):
             continue
         nIn  = opts.neurons[i]
         nOut = opts.neurons[i+1]
-        dof  = nsignal * (nIn + nOut)
-        nMin = nsignal / (2*(nIn + nOut))
-        nMax = nsignal / (10*(nIn + nOut))
+        dof  = (2*nsignal) * (nIn + nOut)     # 2*nsignal = number of samples in training data set
+        nMax = (2*nsignal) / (2*(nIn + nOut))
+        nMin = (2*nsignal) / (10*(nIn + nOut))
         if nOut > nMax or nOut < nMin:
             msg = "The number of neurons for layer #%d (=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nMin, nMax)
             Print(cs + msg + ns, True)
@@ -355,6 +355,9 @@ def main(opts):
         # serialize weights to HDF5
         model.save_weights('model_weights.h5', overwrite=True)
         model.save(modelName)
+        
+        # write weights and architecture in txt file
+        func.WriteModel(model, model_json, "model.txt")
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
     Print("Generating output predictions for the input samples", True) # (e.g. Numpy array)
