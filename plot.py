@@ -85,7 +85,7 @@ def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=Fal
     for ext in saveFormats:
         fileName = "%s.%s" % (savePath, ext)
         canvas.SaveAs( fileName )
-        if 1:#verbose:
+        if verbose:
             print "=== ","%s.%s" % (saveURL, ext)
     return
 

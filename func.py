@@ -170,7 +170,7 @@ def PlotInputs(signal, bkg, var, saveDir, saveFormats):
     leg.AddEntry(hbkg, "Unmatched","pl")
     leg.Draw()
 
-    plot.SavePlot(canvas, saveDir, var, saveFormats)
+    plot.SavePlot(canvas, saveDir, var, saveFormats, True)
     canvas.Close()
     return
         
