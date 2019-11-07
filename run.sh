@@ -1,17 +1,18 @@
 #!/bin/sh   
 
-for ep in 100000 1000000
+for ep in 1000000 10000000 100000000
 do
-    for bs in 10 100 1000 10000# 100000
+    for bs in 100 1000 10000 100000
     do
 	echo "=== Epochs = ${ep}, BatchSize = ${bs}"
 	#nohup ./sequential.py --activation relu,relu,relu,relu,relu,sigmoid --neurons 1024,512,256,128,64,1 --epochs $ep --batchSize $bs --log -s pdf & #does not work
 	#nohup ./sequential.py --activation relu,relu,relu,relu,relu,sigmoid --neurons 256,128,64,32,16,1 --epochs $ep --batchSize $bs --log -s pdf &
-	nohup ./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 128,64,32,16,1 --epochs $ep --batchSize $bs --log -s pdf & # works!
+	#nohup ./sequential.py --activation relu,relu,relu,relu,sigmoid --neurons 128,64,32,16,1 --epochs $ep --batchSize $bs --log -s pdf & # works!
 	#nohup ./sequential.py --activation relu,relu,relu,sigmoid --neurons 64,32,16,1 --epochs $ep --batchSize $bs --log -s pdf & # does not work
 	#nohup ./sequential.py --activation relu,relu,sigmoid --neurons 32,16,1 --epochs $ep --batchSize $bs --log -s pdf & # ~works
 	nohup ./sequential.py --activation relu,relu,sigmoid --neurons 128,64,1 --epochs $ep --batchSize $bs --log -s pdf & # works!
-	nohup ./sequential.py --activation relu,relu,sigmoid --neurons 512,256,1 --epochs $ep --batchSize $bs --log -s pdf & # does not work
+	nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,190,1 --epochs $ep --batchSize $bs --log -s pdf & # ?
+	# nohup ./sequential.py --activation relu,relu,sigmoid --neurons 512,256,1 --epochs $ep --batchSize $bs --log -s pdf & # does not work
 	# nohup ./sequential.py --activation relu,relu,sigmoid --neurons 1024,512,1 --epochs $ep --batchSize $bs --log -s pdf & # does not work
     done
 

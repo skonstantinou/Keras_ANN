@@ -59,7 +59,7 @@ https://cds.cern.ch/record/2157570
 #================================================================================================ 
 # Imports
 #================================================================================================ 
-print "=== Importing KERAS"
+# print "=== Importing KERAS"
 import keras
 import uproot
 import numpy
@@ -205,6 +205,7 @@ def main(opts):
     inputList.append("TrijetSubldgJetMult")
     nInputs = len(inputList)
 
+
     # Construct signal and background dataframes using a list of TBranches (a Dataframe is a two dimensional structure representing data in python)
     Print("Constucting dataframes for signal and background with %d input variables:\n\t%s%s%s" % (nInputs, ss, "\n\t".join(inputList), ns), True)
     df_signal     = signal.pandas.df(inputList) # call an array-fetching method to fill a Pandas DataFrame.
@@ -214,8 +215,22 @@ def main(opts):
     nsignal = len(df_signal.index)
     nbkg    = len(df_background.index)
     Verbose("Signal has %s%d%s row labels. Background has %s%d%s row labels" % (ss, nsignal, ns, es, nbkg, ns), True)
+
+    # Apply rule-of-thumb to prevent over-fitting (https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw)
+    for i, o in enumerate(opts.neurons, 1):
+        # Skip first and last neurons (only hidden layers)
+        if i==0 or i>=len(opts.neurons)-1:
+            continue
+        nIn  = opts.neurons[i]
+        nOut = opts.neurons[i+1]
+        dof  = nsignal * (nIn + nOut)
+        nMin = nsignal / (2*(nIn + nOut))
+        nMax = nsignal / (10*(nIn + nOut))
+        if nOut > nMax or nOut < nMin:
+            msg = "The number of neurons for layer #%d (=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nMin, nMax)
+            Print(cs + msg + ns, True)
     
-    # Sanity check?
+    # Sanity check
     columns = list(df_signal.columns.values)
     Verbose("The signal columns are :\n\t%s%s%s" % (ss, "\n\t".join(columns), ns), True)    
 
@@ -652,11 +667,12 @@ if __name__ == "__main__":
     Print("Using Keras %s (hostname = %s)" % (ss + keras.__version__ + ns, ls + socket.gethostname() + ns), True)
     main(opts)
 
-    # Restore "stdout" to its original state and close the log file
-    sys.stdout =  bak_stdout
-    log_file.close()
-
     Print("All output saved under directory %s" % (ls + opts.saveDir + ns), True)
+
+    # Restore "stdout" to its original state and close the log file
+    if opts.log:
+        sys.stdout =  bak_stdout
+        log_file.close()
 
     if opts.notBatchMode:
         raw_input("=== sequential.py: Press any key to quit ROOT ...")
