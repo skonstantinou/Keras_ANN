@@ -1,0 +1,13 @@
+{
+  "timestamp": "Generated on Wed Nov  6 17:39:33 2019 by jsonWriter.py",
+  "layers": "3",
+  "optimizer": "adam",
+  "loss function": "binary_crossentropy",
+  "epochs": "1000000",
+  "neurons": "[19, 100, 1]",
+  "hidden layers": "1",
+  "batch size": "5000",
+  "model": "sequential",
+  "activation functions": "['relu', 'relu', 'sigmoid']",
+  "dumbie": "None"
+}
