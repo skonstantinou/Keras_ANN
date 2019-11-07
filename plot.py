@@ -85,7 +85,7 @@ def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=Fal
     for ext in saveFormats:
         fileName = "%s.%s" % (savePath, ext)
         canvas.SaveAs( fileName )
-        if verbose:
+        if 1:#verbose:
             print "=== ","%s.%s" % (saveURL, ext)
     return
 
@@ -93,8 +93,130 @@ def ApplyStyle(h, color):
     h.SetLineColor(color)
     h.SetMarkerColor(color)
     h.SetMarkerStyle(8)
-    h.SetMarkerSize(0.3)
+    h.SetMarkerSize(0.5)
     h.SetLineWidth(3)
     h.SetTitle("")
     return
+
+
+def GetHistoInfo(var):
+    h = var.lower()
+    xmin = 0
+    xmax = 1000
+    units = ""
+    xlabel = var
+    width   = 10 # binwidth
+    _format = "%0.0f "
+
+    if "mass" in h:
+        units   = "GeV/c^{2}"
+        xlabel  = "M (%s)" % units
+        _format = "%0.0f "
+        width   = 10
+
+    if "trijetmass" in h:
+        units  = "GeV/c^{2}"
+        xlabel = "m_{top} (%s)" % units
+        xmax = 805 #1005
+
+    if "dijetmass" in h:
+        xlabel = "m_{W} (%s)" % units
+        xmax   = 600
+        width  = 10
+
+    if "bjetmass" in h:
+        xlabel = "m_{b-tagged jet} (%s)" % units
+        width = 1
+        xmax = 50
+
+    if "bjetldgjetmass" in h:
+        xlabel = "m_{b, ldg jet} (%s)" % units
+        xmax = 705
+
+    if "bjetsubldgjetmass" in h:
+        xlabel = "m_{b-tagged, subldg jet} (%s)" % units
+        xmax = 705
+
+    if "jet_mass" in h:
+        xmax = 750
+
+    if "mult" in h:
+        _format = "%0.0f "
+        width = 1
+        xmax = 50
+        if "ldg" in h:
+            xlabel = "Leading jet mult"
+        if "subldg" in h:
+            xlabel = "Subleading jet mult"
+
+    if "cvsl" in h:
+        _format = "%0.2f "
+        width  = 0.01
+        xmax = 1
+        xmin = -1
+        if "ldg" in h:
+            xlabel = "Leading jet CvsL"
+        if "subldg" in h:
+             xlabel = "Subleading jet CvsL"
+
+    if "axis2" in h:
+        _format = "%0.3f "
+        width = 0.004
+        xmax = 0.2
+        if "ldg" in h:
+            xlabel = "Leading jet axis2"
+        if "subldg" in h:
+            xlabel = "Subleading jet axis2"
+
+    if "trijetptdr" in h:
+        xmax =800
+        _format = "%0.0f "
+        xlabel = "p_{T}#Delta R_{t}"
+
+    if "dijetptdr" in h:
+        xmax =800
+        _format = "%0.0f "
+        xlabel = "p_{T}#Delta R_{W}"
+
+    if "dgjetptd" in h:
+        _format = "%0.2f "
+        xlabel = "Leading jet p_{T}D"
+        width = 0.01
+        xmax = 1
+        if "subldg" in h:
+            xlabel = "Subleading jet p_{T}D"
+
+    if "bdisc" in h:
+        _format = "%0.2f "
+        width   = 0.01
+        xmax = 1
+        if "subldg" in h:
+            xlabel = "Subleading jet CSV"
+        elif "ldg" in h:
+            xlabel = "Leading jet CSV"
+        else:
+            xlabel = "b-tagged jet CSV"
+
+    if "softdrop" in h:
+        xmax = 2
+        width = 0.04
+        _format = "%0.2f "
+        xlabel = "SoftDrop_n2"
+    if not (units == ""):
+        units = " (%s)" % units
+        
+    nbins = (xmax - xmin) / width
+    nbins = int(nbins)
+
+    _format = _format % width + units
+    ylabel = "Arbitrary Units / " + _format
+    info     = {
+        "xmin"   : xmin,
+        "xmax"   : xmax,
+        "nbins"  : nbins,
+        "units"  : units,
+        "xlabel" : xlabel,
+        "ylabel" : ylabel,
+    }
+    return info
 

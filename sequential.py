@@ -262,6 +262,11 @@ def main(opts):
     # Get a Numpy representation of the DataFrames for signal and background datasets
     dset_signal     = df_signal.values
     dset_background = df_background.values
+
+    # Plot input variables
+    for i, var in enumerate(inputList, 0):
+        func.PlotInputs(dset_signal[:, i:i+1], dset_background[:, i:i+1], var, "%s/%s" % (opts.saveDir, "inputs"), opts.saveFormats)
+
     Verbose("Printing 1 instance of the Numpy representation of the signal DataFrame:%s" % (ss), True)
     # For-loop: All TBranch entries
     for vList in dset_signal:
