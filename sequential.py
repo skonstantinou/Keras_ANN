@@ -248,13 +248,13 @@ def main(opts):
         # Skip first and last neurons (only hidden layers)
         if i==0 or i>=len(opts.neurons)-1:
             continue
-        nIn  = opts.neurons[i]
-        nOut = opts.neurons[i+1]
+        nIn  = opts.neurons[-1]
+        nOut = opts.neurons[i]
         dof  = (2*nsignal) * (nIn + nOut)     # 2*nsignal = number of samples in training data set
         nMax = (2*nsignal) / (2*(nIn + nOut))
         nMin = (2*nsignal) / (10*(nIn + nOut))
         if nOut > nMax or nOut < nMin:
-            msg = "The number of neurons for layer #%d (=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nMin, nMax)
+            msg = "The number of OUT neurons for layer #%d (IN=%d, OUT=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nOut, nMin, nMax)
             Print(hs + msg + ns, True)
     
     # Sanity check
@@ -351,8 +351,11 @@ def main(opts):
     # Split the datasets (X= 19 inputs, Y=output variable). Test size 0.5 means half for training half for testing
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5, random_state=opts.rndSeed, shuffle=True)
 
-    # Early stop? Show patience of "50" epochs with a change in the loss function smaller than "min_delta" before stopping procedure
-    earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50)
+    # Early stop? Stop training when a monitored quantity has stopped improving.
+    # Show patience of "50" epochs with a change in the loss function smaller than "min_delta" before stopping procedure
+    # https://stackoverflow.com/questions/43906048/keras-early-stopping
+    earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0, patience=10, verbose=1, mode='auto')
+    # earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50) #default - soti
     callbacks_list = [earlystop]
 
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
@@ -367,10 +370,11 @@ def main(opts):
     hist = model.fit(X_train,
                      Y_train,
                      validation_data=(X_test, Y_test),
-                     epochs     = opts.epochs,    # one pass over the entire dataset
+                     epochs     = opts.epochs,    # a full pass over all of your training data
                      batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
                      shuffle    = False,
-                     verbose    = int(not opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
+                     verbose    = 1, # 0=silent, 1=progress, 2=mention the number of epoch
+                     #verbose    = int(not opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
                      callbacks  = callbacks_list
                  )
 
@@ -491,7 +495,7 @@ if __name__ == "__main__":
     VERBOSE      = False
     TEST         = False
     RNDSEED      = 1234
-    EPOCHS       = 5000
+    EPOCHS       = 100
     BATCHSIZE    = 500  # See: http://stats.stackexchange.com/questions/153531/ddg#153535
     ACTIVATION   = "relu" # "relu" or PReLU" or "LeakyReLU"
     NEURONS      = "36,19,1"
@@ -604,8 +608,9 @@ if __name__ == "__main__":
         #Print(es + msg + ns, True) 
     if opts.activation[-1] != "sigmoid":
         msg = "The activation function for the last layer should be set to \"sigmoid\"  (=%s instead)" % (opts.activation[-1])        
-        raise Exception(es + msg + ns)  #Print(es + msg + ns, True)
-    
+        #raise Exception(es + msg + ns)  #Print(es + msg + ns, True)
+        Print(es + msg + ns, True)  #Print(es + msg + ns, True)
+
     # Define dir/logfile names
     specs = "%dLayers" % (len(opts.neurons))
     for i,n in enumerate(opts.neurons, 0):
@@ -617,12 +622,10 @@ if __name__ == "__main__":
     nDay   = now.strftime("%d")
     nMonth = now.strftime("%h")
     nYear  = now.strftime("%Y")
-    nTime  = now.strftime("%Hh%Mm") #now.strftime("%Hh%Mm%Ss")
-    #nDate  = "%s_%s_%s" % (nDay, nMonth, nTime)
-    #nDate  = "%s-%s-%s-%s" % (nDay, nMonth, nYear, nTime)
+    #nTime  = now.strftime("%Hh%Mm") # w/o seconds
+    nTime  = now.strftime("%Hh%Mm%Ss") # w/ seconds
     nDate  = "%s-%s-%s_%s" % (nDay, nMonth, nYear, nTime)
     sName  = "Keras_%s_%s" % (specs, nDate)
-
 
     # Determine path for saving plots
     if opts.saveDir == None:
