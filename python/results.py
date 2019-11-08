@@ -363,10 +363,7 @@ class Output:
         return
 
     def getLegendLabel(self):
-        label = "%sL " % (self.layers)
-        #label+= "%s Opt " % (self.optimizer)
-        label+= " %sb" % (self.batchSize)
-        label+= " %se" % (self.epochs)
+        label = "%sL (" % (self.layers)
         # Dirty trick to convert to list the activationFunctions variable (unicode)
         self.activationList = self.activationFunctions.encode('UTF8').replace("[", "").replace("]", "").replace("'", "").split(",")
         self.neuronsList    = self.neurons.encode('UTF8').replace("[", "").replace("]", "").replace("'", "").replace(" ", "").split(",")
@@ -375,6 +372,11 @@ class Output:
         for i, a in enumerate(self.activationList, 0):
             self.Verbose("%s, type(%s) = %s" % (a, a, type(a)), True)
             label+= " %s%s" % (self.activationList[i].replace("sigmoid", "sig"), self.neuronsList[i])
+
+        label+= ")"
+        label+= " %sb" % (self.batchSize)
+        label+= " %se" % (self.epochs) # this is not very relevant since we have early-stop enabled
+        # self.optimizer
         # self.hiddenLayers
         # self.lossFunction
         # self.model

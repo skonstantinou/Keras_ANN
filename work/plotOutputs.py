@@ -10,14 +10,15 @@ USAGE:
 
 
 EXAMPLES:
-./plotOutputs.py -s png --logY --yMax 1e5 --yMin 1e2 --url --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m
 ./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m --refIndex 2 --cutLineX 0.5
 ./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m --refIndex 2
 ./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
+./plotOutputs.py -s png --logY --plotType output  --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
+./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8
 
 
 LAST USED:
-./plotOutputs.py -s png --logY --plotType output  --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
+./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8 --refIndex 2 
 
 
 '''
@@ -139,8 +140,8 @@ def doCompare(name, resultsList):
         gSigList.extend(gSig)
         gBkgList.extend(gBkg)
         legList.extend(lSig)
-        legList.extend(lBkg) # same as "lSig"
-
+        #legList.extend(lBkg) # same as "lSig"
+        
     kwargs = GetKwargs(opts)
     doPlot(legList, gSigList, opts.saveName + "_Signal"    , **kwargs)
     doPlot(legList, gBkgList, opts.saveName + "_Background", **kwargs)
@@ -152,6 +153,7 @@ def doCompare(name, resultsList):
     kwargs["opts"]["ymax"] = 3.0 #2.0
     kwargs["log"] = False
     tdrstyle.TDRStyle().setLogY(False)
+    tdrstyle.TDRStyle().setLogX(opts.logX)
 
     gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
     gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
@@ -204,10 +206,11 @@ def doPlot(legList, graphList, saveName, **kwargs):
     return
 
 def GetKwargs(opts):
-    legNW  = {"dx": -0.50, "dy": -0.02, "dh": -0.12}
-    legSW  = {"dx": -0.50, "dy": -0.58, "dh": -0.12}
-    legNE  = {"dx": -0.05, "dy": -0.10, "dh": -0.02}
-    legSE  = {"dx": -0.18, "dy": -0.45, "dh": -0.02}
+    dh = -0.12 + (len(opts.dirList)-3)*0.04
+    legNW  = {"dx": -0.50, "dy": -0.02, "dh": dh}
+    legSW  = {"dx": -0.50, "dy": -0.58, "dh": dh}
+    legNE  = {"dx": -0.05, "dy": -0.10, "dh": dh}
+    legSE  = {"dx": -0.18, "dy": -0.45, "dh": dh}
     if opts.paper:
         #histograms.cmsTextMode = histograms.CMSMode.PAPER
         cmsExtraText = ""
@@ -224,7 +227,7 @@ def GetKwargs(opts):
         "addCmsText"       : True,
         "cmsExtraText"     : cmsExtraText,
         "cmsTextPosition"  : "outframe",
-        "opts"             : {"xmin": 0.0, "xmax": 1.0, "ymin": opts.yMin, "ymax": opts.yMax},
+        "opts"             : {"xmin": opts.xMin, "xmax": opts.xMax, "ymin": opts.yMin, "ymax": opts.yMax},
         "opts2"            : {"ymin": 0.59, "ymax": 1.41},
         "log"              : opts.logY,
         "moveLegend"       : legNW,
@@ -238,9 +241,13 @@ def GetKwargs(opts):
         kwargs["opts"]["ymaxfactor"] = opts.yMaxFactor
         del kwargs["opts"]["ymax"]
     if opts.logY and kwargs["opts"]["ymin"] <= 0.0:
-        msg = "Cannot have log-y enabled and ymax set to 0.0. Setting to ymin to 1.0."
+        msg = "Cannot have log-y enabled and y-min set to 0.0. Setting to y-min to 1.0."
         Print(sh_h + msg + sh_n, True)
         kwargs["opts"]["ymin"] = 1e0
+    if opts.logX and kwargs["opts"]["xmin"] <= 0.0:
+        msg = "Cannot have log-x enabled and y-min set to <=0.0. Setting to x-min to 1e-2"
+        Print(sh_h + msg + sh_n, True)
+        kwargs["opts"]["xmin"] = 1e-2
 
     if opts.cutLineX != None:
         kwargs["cutBox"]  = {"cutValue": opts.cutLineX, "fillColor": 16, "box": False, "line": True , "cutGreaterThan": False}
@@ -305,8 +312,8 @@ if __name__ == "__main__":
     RESULTSJSON  = "results.json"
     LOGX         = False
     LOGY         = False
-    XMIN         = None
-    XMAX         = None
+    XMIN         = 0.0
+    XMAX         = 1.0
     YMIN         = None
     YMAX         = None
     YMAXFACTOR   = None
@@ -328,8 +335,8 @@ if __name__ == "__main__":
                       help="Use bold text printed on canvas? [default: %s]" % (BOLDTEXT))
 
     parser.add_option("--dirs", dest="dirs", default=DIRS,
-                      help="List for datacard directories draw in comparison (comma separated WITHOUT space) [default: %s]" % (DIRS))
-    
+                      help="List for Keras directories output (comma separated WITHOUT space) [default: %s]" % (DIRS))
+
     parser.add_option("--resultsJSON", dest="resultsJSON", default=RESULTSJSON,
                       help="JSON file containing the results [default: %s]" % (RESULTSJSON))
     
@@ -404,17 +411,22 @@ if __name__ == "__main__":
 
     # Sanity checks
     opts.dirList = []
-    if opts.dirs == None:
-        msg = "No datacard directories provided!"
-        raise Exception(sh_e + msg + sh_n)
-    else:
+    if opts.dirs != None:
         opts.dirList = opts.dirs.split(",")
+        if "Keras_" not in opts.dirList[0]:
+            opts.dirList = []
+            for d in opts.dirs.split(","):
+                opts.dirList.extend(sorted([w[0] for w in os.walk(d) if "Keras_" in w[0]]))
+            #print opts.dirList
+    else:
+        msg = "No directories provided!"
+        raise Exception(sh_e + msg + sh_n)
 
     if len(opts.dirList) > 1:
-        msg = "Datacard directories considered:%s\n\t%s" % (sh_t, "\n\t".join(opts.dirList))
+        msg = "Directories considered:%s\n\t%s" % (sh_t, "\n\t".join(opts.dirList))
         Verbose(msg + sh_n, True)
     else:
-        msg = "At least 2 datacard directories required. Only %d passed with --dirs argument!" % len(opts.dirsList)
+        msg = "At least 2 directories required. Only %d passed with --dirs argument!" % len(opts.dirList)
         raise Exception(sh_e + msg + sh_n)
 
     # Sanity check (analysis type)
