@@ -113,6 +113,8 @@ class Output:
         self.verbose = verbose
         self.storeCfgFiles()
         self.storeAnalysisType(analysisType)
+        self.yMin = None
+        self.yMax = None
         return
 
     def Print(self, msg, printHeader=False):
@@ -390,10 +392,11 @@ class Output:
                     continue 
             xArray = array.array("d", self.resultsX[k])
             yArray = array.array("d", self.resultsY[k])
-            graph  = ROOT.TGraph(len(xArray), xArray, yArray)
-            graph.SetName(k) # + "_%d" % (i))
+            # Save ymin for later use
+            self._storeYMinYMax(yArray)
+            graph  = ROOT.TGraph(len(xArray), xArray, yArray)    
+            graph.SetName(k)
             styles.applyStyle(graph, i)
-            # setExpectedStyle(gr) #fixme
             graphList.append(graph)
             legList.append(self.getLegendLabel())
         return graphList, legList
@@ -401,61 +404,33 @@ class Output:
     def getGraphs(self, keyword=None):
         return self._getGraphs(keyword)
 
-    def expectedErrorGraph(self, sigma=0):
-        '''
-        Construct TGraph for the expected limit toy MC stat error
+    def _storeYMinYMax(self, yArray):
+        ySorted = sorted(set(yArray))
+        yMin = 1e10
+        yMax = ySorted[-1]
         
-        \param sigma   Integer for the sigma band (0 for median, 1,-1, 2,-2)
-        
-        \return TGraph of the expexted limit stat error
-        '''
-        if not hasattr(self, "expectedMedianError"):
-            return None
-        return self._getGraph("Error", sigma)
+        for y in ySorted:
+            if y <= 0.0:
+                continue
+            else:
+                yMin = y
+                break
 
-
-    def expectedBandGraph(self, sigma):
-        '''
-        Construct TGraph for the expected +-1/2 sigma bands
-        
-        \param sigma   Integer for the sigma bands (1, 2)
-        
-        \return TGraph for the expected sigma bands
-        
-        The TGraph holds the sigma bands as the values. The values go
-        first through the lower band in the increasing mass order, then
-        the upper band in the decreasing mass order
-        '''
-        xArray = array.array("d", self.mass)
-        massErr = array.array("d", [0]*len(self.mass))
-        if sigma == 1:
-            tmp1 = self.mass[:]
-            tmp1.reverse()
-            tmp2 = self.expectedPlus1[:]
-            tmp2.reverse()
-
-            gr = ROOT.TGraph(2*len(self.mass),
-                             array.array("d", self.mass+tmp1),
-                             array.array("d", self.expectedMinus1 + tmp2))
-
-            setExpectedGreenBandStyle(gr)
-            
-            gr.SetName("Expected1Sigma")
-        elif sigma == 2:
-            tmp1 = self.mass[:]
-            tmp1.reverse()
-            tmp2 = self.expectedPlus2[:]
-            tmp2.reverse()
-
-#            print self.mass+tmp1
-#            print self.expectedMinus2+tmp2
-
-            gr = ROOT.TGraph(2*len(self.mass),
-                             array.array("d", self.mass+tmp1),
-                             array.array("d", self.expectedMinus2 + tmp2))
-
-            setExpectedYellowBandStyle(gr)
-            gr.SetName("Expected2Sigma")
+        if self.yMin == None:
+            self.yMin = yMin
         else:
-            raise Exception("Invalid value of sigma '%d', valid values are 0,1,2" % sigma)
-        return gr
+            if yMin < self.yMin:
+                self.yMin = yMin
+
+        if self.yMax == None:
+            self.yMax = yMax
+        else:
+            if yMax > self.yMax:
+                self.yMax = yMax
+        return
+
+    def getYMin(self):
+        return self.yMin
+
+    def getYMax(self):
+        return self.yMax
