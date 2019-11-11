@@ -15,11 +15,16 @@ EXAMPLES:
 ./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
 ./plotOutputs.py -s png --logY --plotType output  --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
 ./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8
+./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8 --refIndex 3
+./plotOutputs.py -s png --logY --plotType output --dirs new1,new2 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType significance --dirs new1,new2 --saveDir /publicweb/a/aattikis/Test --yMin 0.0 --refIndex 3 --yMaxFactor 1.1
 
 
 LAST USED:
-./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8 --refIndex 2 
-
+./plotOutputs.py -s png --logY --plotType output --dirs new1,new2,new3 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2,new3 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 3 --dirs new1,new2,new3 --saveDir /publicweb/a/aattikis/Test 
 
 '''
 #================================================================================================
@@ -115,8 +120,15 @@ def main():
     # Do comparison plot
     msg  = "Creating comparison plots (%d) using the following results directories:%s\n\t%s" % (len(opts.dirList), sh_t, "\n\t".join([os.path.basename(d) for d in opts.dirList]) )
     Print(msg + sh_n, True)
-    doCompare(opts.saveName, resultsList) 
-
+    if "output" in opts.plotType.lower():
+        doCompare(opts.saveName, resultsList) 
+    elif "efficiency" in opts.plotType.lower():
+        doCompareAlt(opts.saveName, ["Sig", "Bkg"], resultsList)
+    elif "significance" in opts.plotType.lower():
+        doCompareAlt(opts.saveName, ["A", "B"], resultsList) 
+    else:
+        pass
+    
     # inform user of output location
     Print("Plots saved under directory %s"% (sh_s + aux.convertToURL(opts.saveDir, opts.url) + sh_n), True)
     return
@@ -131,8 +143,8 @@ def doCompare(name, resultsList):
 
     # For-loop: All Output-class objects
     for r in resultsList:
-        gSig, lSig = r.getGraphs(opts.plotName + "_signal") #"Output_signal")
-        gBkg, lBkg = r.getGraphs(opts.plotName + "_background") #"Output_background")
+        gSig, lSig = r.getGraphs(opts.plotName + "_signal")
+        gBkg, lBkg = r.getGraphs(opts.plotName + "_background")
         if opts.yMin == None:
             opts.yMin = r.getYMin()
         if opts.yMax == None and opts.yMax == None:
@@ -141,7 +153,12 @@ def doCompare(name, resultsList):
         gBkgList.extend(gBkg)
         legList.extend(lSig)
         #legList.extend(lBkg) # same as "lSig"
-        
+
+    # Re-arrange legend
+    legList.insert(0, legList.pop(opts.refIndex))
+    gSigList.insert(0, gSigList.pop(opts.refIndex))
+    gBkgList.insert(0, gBkgList.pop(opts.refIndex))
+    # Plot the graphs
     kwargs = GetKwargs(opts)
     doPlot(legList, gSigList, opts.saveName + "_Signal"    , **kwargs)
     doPlot(legList, gBkgList, opts.saveName + "_Background", **kwargs)
@@ -155,10 +172,58 @@ def doCompare(name, resultsList):
     tdrstyle.TDRStyle().setLogY(False)
     tdrstyle.TDRStyle().setLogX(opts.logX)
 
+    # Plot the graphs
     gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
     gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
     doPlot(legList, gSigList, opts.saveName + "_SignalRel"    , **kwargs)
     doPlot(legList, gBkgList, opts.saveName + "_BackgroundRel", **kwargs)
+    return
+
+def doCompareAlt(name, nameExt, resultsList):
+
+    # Do the comparison plot
+    Verbose("Creating the expected plots", True)
+    gSigList = []
+    gBkgList = []
+    legList  = []
+
+    # For-loop: All Output-class objects
+    for r in resultsList:
+        gSig, lSig = r.getGraphs(opts.plotName + nameExt[0])
+        gBkg, lBkg = r.getGraphs(opts.plotName + nameExt[1])
+        if opts.yMin == None:
+            opts.yMin = r.getYMin()
+        if opts.yMax == None and opts.yMax == None:
+            opts.yMax = r.getYMax()*1.10
+        gSigList.extend(gSig)
+        gBkgList.extend(gBkg)
+        legList.extend(lSig)
+        #legList.extend(lBkg) # same as "lSig"
+        
+    # Re-arrange legend
+    legList.insert(0, legList.pop(opts.refIndex))
+    gSigList.insert(0, gSigList.pop(opts.refIndex))
+    gBkgList.insert(0, gBkgList.pop(opts.refIndex))
+    # Plot the graphs
+    kwargs = GetKwargs(opts)
+    doPlot(legList, gSigList, opts.saveName + "_" + nameExt[0], **kwargs)
+    doPlot(legList, gBkgList, opts.saveName + "_" + nameExt[1], **kwargs)
+
+    # Do the relative plot
+    Verbose("Creating the relative plots", True)
+    kwargs["ylabel"] = "Ratio"
+    kwargs["opts"]["ymin"] = 0.0
+    kwargs["opts"]["ymax"] = 3.0 #2.0
+    dh = -0.12 + (len(opts.dirList)-3)*0.04
+    kwargs["moveLegend"]   = {"dx": -0.53, "dy": -0.05, "dh": dh} 
+    kwargs["log"] = False
+    tdrstyle.TDRStyle().setLogY(False)
+    tdrstyle.TDRStyle().setLogX(opts.logX)
+
+    gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
+    gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
+    doPlot(legList, gSigList, opts.saveName + "_" + nameExt[0] + "Rel", **kwargs)
+    doPlot(legList, gBkgList, opts.saveName + "_" + nameExt[1] + "Rel", **kwargs)
     return
 
 def doPlot(legList, graphList, saveName, **kwargs):
@@ -178,8 +243,9 @@ def doPlot(legList, graphList, saveName, **kwargs):
 
     # Create a plot-base object
     # plot = plots.PlotBase(hgList, saveFormats=[])
-    # plot = plots.ComparisonManyPlot(hgList[0], hgList[1:], saveFormats=[])
-    plot = plots.ComparisonManyPlot(hgList[-1], hgList[:-1], saveFormats=[])
+    hgList.insert(0, hgList.pop(opts.refIndex)) #iro
+    plot = plots.ComparisonManyPlot(hgList[0], hgList[1:], saveFormats=[])
+    #plot = plots.ComparisonManyPlot(hgList[-1], hgList[:-1], saveFormats=[])
 
     # Apply histo style
     plot.histoMgr.forEachHisto(styles.generator())
@@ -190,6 +256,12 @@ def doPlot(legList, graphList, saveName, **kwargs):
         r = h.getRootHisto()
         r.SetLineWidth(3)
         r.SetMarkerSize(1.2)
+        #if "signal" in saveName.lower():
+        #    r.SetLineStyle(ROOT.kSolid)
+        #elif "background" in saveName.lower():
+        #    r.SetLineStyle(ROOT.kDotted)
+        #else:
+        #    r.SetLineStyle(ROOT.kDashDotted)
         return
 
     # Apply style and set label
@@ -207,9 +279,9 @@ def doPlot(legList, graphList, saveName, **kwargs):
 
 def GetKwargs(opts):
     dh = -0.12 + (len(opts.dirList)-3)*0.04
-    legNW  = {"dx": -0.50, "dy": -0.02, "dh": dh}
-    legSW  = {"dx": -0.50, "dy": -0.58, "dh": dh}
-    legNE  = {"dx": -0.05, "dy": -0.10, "dh": dh}
+    legNW  = {"dx": -0.53, "dy": -0.05, "dh": dh}
+    legSW  = {"dx": -0.53, "dy": -0.30, "dh": dh}
+    legNE  = {"dx": -0.05, "dy": -0.05, "dh": dh}
     legSE  = {"dx": -0.18, "dy": -0.45, "dh": dh}
     if opts.paper:
         #histograms.cmsTextMode = histograms.CMSMode.PAPER
@@ -254,6 +326,13 @@ def GetKwargs(opts):
     if opts.cutLineY != None:
         Print("This does not work! Bug-fixing required!", True)
         kwargs["cutBoxY"] = {"cutValue": opts.cutLineY, "fillColor": 16, "box": True, "line": True, "cutGreaterThan": False} 
+
+    if opts.plotType == "efficiency":
+        kwargs["ylabel"] = "Efficiency"
+
+    if opts.plotType == "significance":
+        #kwargs["moveLegend"] = legSW
+        pass
 
     return kwargs
 
@@ -318,7 +397,7 @@ if __name__ == "__main__":
     YMAX         = None
     YMAXFACTOR   = None
     PAPER        = False
-    SAVENAME     = "results"
+    SAVENAME     = None
     SAVEDIR      = None
     SAVEFORMATS  = "png" #pdf,png,C"
     URL          = False
@@ -461,13 +540,19 @@ if __name__ == "__main__":
                 msg = "Directory \"%s\" does not exist" % (os.path.join(d))
                 raise Exception(sh_e + msg + sh_n)
 
+    for i, d in enumerate(opts.dirList, 0):
+        Verbose("index = %d, dir = %s" % (i, d), i==0)
+        
     # Check plot type
-    plotTypes = ["output", "prediction", "training", "testing"]
+    plotTypes = ["output", "prediction", "training", "testing", "efficiency", "significance"]
     plotNames = {}
-    plotNames["output"]     = "Output"
-    plotNames["prediction"] = "OutputPred"
-    plotNames["training"]   = "OutputTrain"
-    plotNames["testing"]    = "OutputTest"
+    plotNames["output"]       = "Output"
+    plotNames["prediction"]   = "OutputPred"
+    plotNames["training"]     = "OutputTrain"
+    plotNames["testing"]      = "OutputTest"
+    plotNames["efficiency"]   = "Efficiency"
+    plotNames["significance"] = "Significance"
+
     if opts.plotType.lower() not in plotTypes:
         msg = "Unsupported plot type  \"%s\". Please select from the following:" % (", ".join(plotTypes))
         raise Exception(sh_e + msg + sh_n)
@@ -478,6 +563,9 @@ if __name__ == "__main__":
     if opts.saveDir == None:
         #opts.saveDir = opts.dirList[0]
         opts.saveDir = aux.getSaveDirPath(opts.dirList[0], prefix="", postfix=opts.plotType)
+
+    if opts.saveName == None:
+        opts.saveName = opts.plotType
 
     # Create save formats
     if "," in opts.saveFormats:

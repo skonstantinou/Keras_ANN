@@ -436,3 +436,6 @@ class Output:
 
     def getYMax(self):
         return self.yMax
+
+    def getDirectory(self):
+        return self.directory
