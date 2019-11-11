@@ -10,11 +10,16 @@ USAGE:
 
 
 EXAMPLES:
-./plotOutputs.py -s png --logY --yMax 1e5 --yMin 1e2 --url --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m
 ./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m --refIndex 2 --cutLineX 0.5
+./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m --refIndex 2
+./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
+./plotOutputs.py -s png --logY --plotType output  --dirs Keras_3Layers_19relu_190relu_1sigmoid_10Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_15Epochs_100BatchSize_07-Nov-2019_18h19m,Keras_3Layers_19relu_190relu_1sigmoid_20Epochs_100BatchSize_07-Nov-2019_18h19m
+./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8
+
 
 LAST USED:
-./plotOutputs.py -s png --logY --yMin 5e1 --saveDir /publicweb/a/aattikis/Test/ --dirs Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_5000BatchSize_06-Nov-2019_17h39m,Keras_3Layers_19relu_100relu_1sigmoid_1000000Epochs_500BatchSize_06-Nov-2019_17h06m,Keras_3Layers_1024relu_512relu_1sigmoid_100000Epochs_1000BatchSize_05-Nov-2019_14h49m --refIndex 2
+./plotOutputs.py -s png --logY --plotType output --dirs trial6,trial7,trial8 --refIndex 2 
+
 
 '''
 #================================================================================================
@@ -110,14 +115,13 @@ def main():
     # Do comparison plot
     msg  = "Creating comparison plots (%d) using the following results directories:%s\n\t%s" % (len(opts.dirList), sh_t, "\n\t".join([os.path.basename(d) for d in opts.dirList]) )
     Print(msg + sh_n, True)
-    kwargs = GetKwargs(opts)
-    doCompare(opts.saveName, resultsList, **kwargs) 
+    doCompare(opts.saveName, resultsList) 
 
     # inform user of output location
     Print("Plots saved under directory %s"% (sh_s + aux.convertToURL(opts.saveDir, opts.url) + sh_n), True)
     return
 
-def doCompare(name, resultsList, **kwargs):
+def doCompare(name, resultsList):
 
     # Do the comparison plot
     Verbose("Creating the expected plots", True)
@@ -127,21 +131,29 @@ def doCompare(name, resultsList, **kwargs):
 
     # For-loop: All Output-class objects
     for r in resultsList:
-        gSig, lSig = r.getGraphs("signal")
-        gBkg, lBkg = r.getGraphs("background")
+        gSig, lSig = r.getGraphs(opts.plotName + "_signal") #"Output_signal")
+        gBkg, lBkg = r.getGraphs(opts.plotName + "_background") #"Output_background")
+        if opts.yMin == None:
+            opts.yMin = r.getYMin()
+        if opts.yMax == None and opts.yMax == None:
+            opts.yMax = r.getYMax()*1.10
         gSigList.extend(gSig)
         gBkgList.extend(gBkg)
         legList.extend(lSig)
-        legList.extend(lBkg) # same as "lSig"
+        #legList.extend(lBkg) # same as "lSig"
+        
+    kwargs = GetKwargs(opts)
     doPlot(legList, gSigList, opts.saveName + "_Signal"    , **kwargs)
     doPlot(legList, gBkgList, opts.saveName + "_Background", **kwargs)
 
     # Do the relative plot
     Verbose("Creating the relative plots", True)
+    kwargs["ylabel"] = "Ratio"
     kwargs["opts"]["ymin"] = 0.0
-    kwargs["opts"]["ymax"] = 2.0
+    kwargs["opts"]["ymax"] = 3.0 #2.0
     kwargs["log"] = False
     tdrstyle.TDRStyle().setLogY(False)
+    tdrstyle.TDRStyle().setLogX(opts.logX)
 
     gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
     gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
@@ -194,10 +206,11 @@ def doPlot(legList, graphList, saveName, **kwargs):
     return
 
 def GetKwargs(opts):
-    legNW  = {"dx": -0.50, "dy": -0.07, "dh": -0.12}
-    legSW  = {"dx": -0.50, "dy": -0.58, "dh": -0.12}
-    legNE  = {"dx": -0.05, "dy": -0.10, "dh": -0.02}
-    legSE  = {"dx": -0.18, "dy": -0.45, "dh": -0.02}
+    dh = -0.12 + (len(opts.dirList)-3)*0.04
+    legNW  = {"dx": -0.50, "dy": -0.02, "dh": dh}
+    legSW  = {"dx": -0.50, "dy": -0.58, "dh": dh}
+    legNE  = {"dx": -0.05, "dy": -0.10, "dh": dh}
+    legSE  = {"dx": -0.18, "dy": -0.45, "dh": dh}
     if opts.paper:
         #histograms.cmsTextMode = histograms.CMSMode.PAPER
         cmsExtraText = ""
@@ -214,7 +227,7 @@ def GetKwargs(opts):
         "addCmsText"       : True,
         "cmsExtraText"     : cmsExtraText,
         "cmsTextPosition"  : "outframe",
-        "opts"             : {"xmin": 0.0, "xmax": 1.0, "ymin": 0.0, "ymaxfactor": 2},
+        "opts"             : {"xmin": opts.xMin, "xmax": opts.xMax, "ymin": opts.yMin, "ymax": opts.yMax},
         "opts2"            : {"ymin": 0.59, "ymax": 1.41},
         "log"              : opts.logY,
         "moveLegend"       : legNW,
@@ -223,17 +236,18 @@ def GetKwargs(opts):
         "cutBox"           : {"cutValue":  0.0, "fillColor": 16, "box": False, "line": False , "cutGreaterThan": False},
         #"cutBoxY"          : {"cutValue": 1000.0, "fillColor": 16, "box": False, "line": True, "cutGreaterThan": False}  # does not work!
         }
-        
-    if opts.yMin:
-        kwargs["opts"]["ymin"] = opts.yMin
-    if opts.yMax:
-        kwargs["opts"]["ymax"] = opts.yMax
+            
     if opts.yMaxFactor:
         kwargs["opts"]["ymaxfactor"] = opts.yMaxFactor
+        del kwargs["opts"]["ymax"]
     if opts.logY and kwargs["opts"]["ymin"] <= 0.0:
-        msg = "Cannot have log-y enabled and ymax set to 0.0. Setting to ymin to 1.0."
+        msg = "Cannot have log-y enabled and y-min set to 0.0. Setting to y-min to 1.0."
         Print(sh_h + msg + sh_n, True)
         kwargs["opts"]["ymin"] = 1e0
+    if opts.logX and kwargs["opts"]["xmin"] <= 0.0:
+        msg = "Cannot have log-x enabled and y-min set to <=0.0. Setting to x-min to 1e-2"
+        Print(sh_h + msg + sh_n, True)
+        kwargs["opts"]["xmin"] = 1e-2
 
     if opts.cutLineX != None:
         kwargs["cutBox"]  = {"cutValue": opts.cutLineX, "fillColor": 16, "box": False, "line": True , "cutGreaterThan": False}
@@ -298,8 +312,8 @@ if __name__ == "__main__":
     RESULTSJSON  = "results.json"
     LOGX         = False
     LOGY         = False
-    XMIN         = None
-    XMAX         = None
+    XMIN         = 0.0
+    XMAX         = 1.0
     YMIN         = None
     YMAX         = None
     YMAXFACTOR   = None
@@ -311,9 +325,9 @@ if __name__ == "__main__":
     VERBOSE      = False
     BOLDTEXT     = False
     DIRS         = None
+    PLOTTYPE     = "output"
 
     parser = OptionParser(usage="Usage: %prog [options]", add_help_option=True, conflict_handler="resolve")
-
     parser.add_option("-v", "--verbose", dest="verbose", default=VERBOSE, action="store_true",
                       help="Verbose mode for debugging purposes [default: %s]" % (VERBOSE) )
     
@@ -321,8 +335,8 @@ if __name__ == "__main__":
                       help="Use bold text printed on canvas? [default: %s]" % (BOLDTEXT))
 
     parser.add_option("--dirs", dest="dirs", default=DIRS,
-                      help="List for datacard directories draw in comparison (comma separated WITHOUT space) [default: %s]" % (DIRS))
-    
+                      help="List for Keras directories output (comma separated WITHOUT space) [default: %s]" % (DIRS))
+
     parser.add_option("--resultsJSON", dest="resultsJSON", default=RESULTSJSON,
                       help="JSON file containing the results [default: %s]" % (RESULTSJSON))
     
@@ -346,6 +360,9 @@ if __name__ == "__main__":
 
     parser.add_option("--saveDir", dest="saveDir", type="string", default=SAVEDIR,
                       help="Directory where all plots will be saved [default: %s]" % SAVEDIR)
+
+    parser.add_option("--plotType", dest="plotType", type="string", default=PLOTTYPE,
+                      help="Type of plot to produce (poutput, pred, test, train)  saved [default: %s]" % PLOTTYPE)
 
     parser.add_option("--logX", dest="logX", action="store_true", default=LOGX,
                       help="Plot x-axis (mass) as logarithmic [default: %s]" % (LOGX) )
@@ -394,17 +411,22 @@ if __name__ == "__main__":
 
     # Sanity checks
     opts.dirList = []
-    if opts.dirs == None:
-        msg = "No datacard directories provided!"
-        raise Exception(sh_e + msg + sh_n)
-    else:
+    if opts.dirs != None:
         opts.dirList = opts.dirs.split(",")
+        if "Keras_" not in opts.dirList[0]:
+            opts.dirList = []
+            for d in opts.dirs.split(","):
+                opts.dirList.extend(sorted([w[0] for w in os.walk(d) if "Keras_" in w[0]]))
+            #print opts.dirList
+    else:
+        msg = "No directories provided!"
+        raise Exception(sh_e + msg + sh_n)
 
     if len(opts.dirList) > 1:
-        msg = "Datacard directories considered:%s\n\t%s" % (sh_t, "\n\t".join(opts.dirList))
+        msg = "Directories considered:%s\n\t%s" % (sh_t, "\n\t".join(opts.dirList))
         Verbose(msg + sh_n, True)
     else:
-        msg = "At least 2 datacard directories required. Only %d passed with --dirs argument!" % len(opts.dirsList)
+        msg = "At least 2 directories required. Only %d passed with --dirs argument!" % len(opts.dirList)
         raise Exception(sh_e + msg + sh_n)
 
     # Sanity check (analysis type)
@@ -439,11 +461,23 @@ if __name__ == "__main__":
                 msg = "Directory \"%s\" does not exist" % (os.path.join(d))
                 raise Exception(sh_e + msg + sh_n)
 
+    # Check plot type
+    plotTypes = ["output", "prediction", "training", "testing"]
+    plotNames = {}
+    plotNames["output"]     = "Output"
+    plotNames["prediction"] = "OutputPred"
+    plotNames["training"]   = "OutputTrain"
+    plotNames["testing"]    = "OutputTest"
+    if opts.plotType.lower() not in plotTypes:
+        msg = "Unsupported plot type  \"%s\". Please select from the following:" % (", ".join(plotTypes))
+        raise Exception(sh_e + msg + sh_n)
+    else:
+        opts.plotName = plotNames[opts.plotType]
+
     # Define directory name for saving output
     if opts.saveDir == None:
-        opts.saveDir = opts.dirList[0]
-    else:
-        pass
+        #opts.saveDir = opts.dirList[0]
+        opts.saveDir = aux.getSaveDirPath(opts.dirList[0], prefix="", postfix=opts.plotType)
 
     # Create save formats
     if "," in opts.saveFormats:
