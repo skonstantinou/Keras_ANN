@@ -16,10 +16,14 @@
 # 
 # sleep 10
 
-for bs in 100 150 200 500 1000; do 
+#for bs in 100 200 500 1000; do 
+for bs in 16 32 64 128 256 512 1024; do 
     echo "=== Epochs = ${ep}, BatchSize = ${bs}"
     sleep 15
-    nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,200,1 --epochs 100 --batchSize $bs --log -s pdf &
+    #nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,200,1 --epochs 100 --batchSize $bs --log -s pdf &
+    #nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,500,1 --epochs 1000 --batchSize $bs --log -s pdf &
+    nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,100,1 --epochs 1000 --batchSize $bs --log -s pdf &
+
     #nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,500,1 --epochs 100 --batchSize $bs --log -s pdf &
     #nohup ./sequential.py --activation elu,elu,sigmoid --neurons 19,500,1 --epochs 100 --batchSize $bs --log -s pdf &
 done

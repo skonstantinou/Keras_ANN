@@ -128,6 +128,15 @@ def Verbose(msg, printHeader=True, verbose=False):
     Print(msg, printHeader)
     return
 
+def GetTime(tStart):
+    tFinish = time.time()
+    dt      = int(tFinish) - int(tStart)
+    days    = divmod(dt,86400)      # days
+    hours   = divmod(days[1],3600)  # hours
+    mins    = divmod(hours[1],60)   # minutes
+    secs    = mins[1]               # seconds
+    return days, hours, mins, secs
+
 def writeCfgFile(opts):
 
     # Write to json file
@@ -174,8 +183,8 @@ def main(opts):
     Verbose("Started @ " + str(tStart), True)
 
     # Write a JSON file with model information 
-    writeCfgFile(opts)
-    writeGitFile(opts)
+    #writeCfgFile(opts)
+    #writeGitFile(opts)
 
     # Do not display canvases
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
@@ -364,6 +373,10 @@ def main(opts):
     model.compile(loss=opts.lossFunction, optimizer=opts.optimizer, metrics=['acc'])
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     
+    # batch size equal to the training batch size (See https://machinelearningmastery.com/use-different-batch-sizes-training-predicting-python-keras/)
+    if opts.batchSize == None:
+        opts.batchSize = len(X_train)/2
+
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
     # used to separate training into distinct phases, which is useful for logging and periodic evaluation.)
@@ -395,6 +408,7 @@ def main(opts):
         func.WriteModel(model, model_json, os.path.join(opts.saveDir, "model.txt") )
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
+    # https://stackoverflow.com/questions/49288199/batch-size-in-model-fit-and-model-predict
     Print("Generating output predictions for the input samples", True) # (e.g. Numpy array)
     pred_train  = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
     pred_test   = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
@@ -421,47 +435,46 @@ def main(opts):
     pred_train_B =  model.predict(x_train_B, batch_size=None, verbose=1, steps=None)
     pred_test_S  =  model.predict(x_test_S , batch_size=None, verbose=1, steps=None)
     pred_test_B  =  model.predict(x_test_B , batch_size=None, verbose=1, steps=None)
-    
-    # Create json file
+
+    # Inform user of early stop
+    stopEpoch = earlystop.stopped_epoch
+    if stopEpoch != 0 and stopEpoch < opts.epochs:
+        msg = "Early stop occured after %d epochs!" % (stopEpoch)
+        opts.epochs = stopEpoch
+        Print(cs + msg + ns, True)
+
+    # Create json files
+    writeCfgFile(opts)
+    writeGitFile(opts)
     jsonWr  = JsonWriter(saveDir=opts.saveDir, verbose=opts.verbose)
 
     # Plot selected output and save to JSON file for future use
-    resDict = {}
-    resDict["signal"]     = pred_signal
-    resDict["background"] = pred_bkg
-    func.PlotAndWriteJSON(resDict, opts.saveDir, "Output", jsonWr, opts.saveFormats)
+    func.PlotAndWriteJSON(pred_signal , pred_bkg    , opts.saveDir, "Output"     , jsonWr, opts.saveFormats)
+    func.PlotAndWriteJSON(pred_train  , pred_test   , opts.saveDir, "OutputPred" , jsonWr, opts.saveFormats)
+    func.PlotAndWriteJSON(pred_train_S, pred_train_B, opts.saveDir, "OutputTrain", jsonWr, opts.saveFormats)
+    func.PlotAndWriteJSON(pred_test_S , pred_test_B , opts.saveDir, "OutputTest" , jsonWr, opts.saveFormats)
 
-    resDict = {}
-    resDict["signal"]     = pred_train
-    resDict["background"] = pred_test
-    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputPred", jsonWr, opts.saveFormats)
+    # Plot overtraining test
+    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
 
-    resDict = {}
-    resDict["signal"]     = pred_train_S
-    resDict["background"] = pred_train_B
-    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputTrain", jsonWr, opts.saveFormats)
+    # Plot summary plot (efficiency & singificance)
+    func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Summary", opts.saveFormats)
 
-    resDict = {}
-    resDict["signal"]     = pred_test_S
-    resDict["background"] = pred_test_B
-    func.PlotAndWriteJSON(resDict, opts.saveDir, "OutputTest", jsonWr, opts.saveFormats)
+    # Write efficiencies (signal and bkg)
+    xVals_S, xErrs_S, effVals_S, effErrs_S  = func.GetEfficiency(htest_s)
+    xVals_B, xErrs_B, effVals_B, effErrs_B  = func.GetEfficiency(htest_b)
+    func.PlotTGraph(xVals_S, xErrs_S, effVals_S, effErrs_S, opts.saveDir, "EfficiencySig", jsonWr, opts.saveFormats)
+    func.PlotTGraph(xVals_B, xErrs_B, effVals_B, effErrs_B, opts.saveDir, "EfficiencyBkg", jsonWr, opts.saveFormats)
+
+    xVals, xErrs, sig_def, sig_alt = func.GetSignificance(htest_s, htest_b)
+    func.PlotTGraph(xVals, xErrs, sig_def, effErrs_B, opts.saveDir, "SignificanceA", jsonWr, opts.saveFormats)
+    func.PlotTGraph(xVals, xErrs, sig_alt, effErrs_B, opts.saveDir, "SignificanceB", jsonWr, opts.saveFormats)
 
     # Write the  resultsJSON file!
     jsonWr.write(opts.resultsJSON)
-
-    # Calculate efficiency (Entries Vs Output)
-    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, opts.saveDir, "OvertrainingTest", opts.saveFormats)
-    func.PlotEfficiency(htest_s, htest_b, opts.saveDir, "Efficiency", opts.saveFormats)
-    #func.PlotAndWriteJSON(resDict, opts.saveDir, "Efficiency", jsonWr, opts.saveFormats) #fixme
-
     
     # Print total time elapsed
-    tFinish = time.time()
-    dt      = int(tFinish) - int(tStart)
-    days    = divmod(dt,86400)      # days
-    hours   = divmod(days[1],3600)  # hours
-    mins    = divmod(hours[1],60)   # minutes
-    secs    = mins[1]               # seconds
+    days, hours, mins, secs = GetTime(tStart)
     Print("Total elapsed time is %s days, %s hours, %s mins, %s secs" % (days[0], hours[0], mins[0], secs), True)
     
     return 
@@ -496,7 +509,7 @@ if __name__ == "__main__":
     TEST         = False
     RNDSEED      = 1234
     EPOCHS       = 100
-    BATCHSIZE    = 500  # See: http://stats.stackexchange.com/questions/153531/ddg#153535
+    BATCHSIZE    = None  # See: http://stats.stackexchange.com/questions/153531/ddg#153535
     ACTIVATION   = "relu" # "relu" or PReLU" or "LeakyReLU"
     NEURONS      = "36,19,1"
     LOG          = False
@@ -615,7 +628,7 @@ if __name__ == "__main__":
     specs = "%dLayers" % (len(opts.neurons))
     for i,n in enumerate(opts.neurons, 0):
         specs+= "_%s%s" % (opts.neurons[i], opts.activation[i])
-    specs+= "_%dEpochs_%dBatchSize" % (opts.epochs, opts.batchSize)
+    specs+= "_%sEpochs_%sBatchSize" % (opts.epochs, opts.batchSize)
 
     # Get the current date and time
     now    = datetime.now()
