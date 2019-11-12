@@ -406,6 +406,12 @@ class Output:
     def getGraphs(self, keyword=None):
         return self._getGraphs(keyword)
 
+    def getXarray(self):
+        return array.array("d", self.resultsX[k])
+
+    def getYarray(self):
+        return array.array("d", self.resultsY[k])
+
     def _storeYMinYMax(self, yArray):
         ySorted = sorted(set(yArray))
         yMin = 1e10

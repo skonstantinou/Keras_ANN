@@ -19,12 +19,19 @@ EXAMPLES:
 ./plotOutputs.py -s png --logY --plotType output --dirs new1,new2 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
 ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
 ./plotOutputs.py -s png --plotType significance --dirs new1,new2 --saveDir /publicweb/a/aattikis/Test --yMin 0.0 --refIndex 3 --yMaxFactor 1.1
+./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --dirs new5,new6,new7,new8 --saveDir /publicweb/a/aattikis/new5_6_7_8
 
 
 LAST USED:
-./plotOutputs.py -s png --logY --plotType output --dirs new1,new2,new3 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --dirs new5,new6,new7,new8 --saveDir /publicweb/a/aattikis/new5_6_7_8
 ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2,new3 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
 ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 3 --dirs new1,new2,new3 --saveDir /publicweb/a/aattikis/Test 
+./plotOutputs.py -s png --logY --plotType output --dirs new1,new2,new3,new4 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2,new3,new4 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 8 --dirs new1,new2,new3,new4 --saveDir /publicweb/a/aattikis/Test
+
+./plotOutputs.py -s png --logY --plotType output --dirs new1,new8,new9 --refIndex 0 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType efficiency --dirs new1,new8,new9 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 0 --dirs new1,new8,new9 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType roc --logY --dirs new1,new8,new9 --saveDir /publicweb/a/aattikis/Test
+
+
+
 
 '''
 #================================================================================================
@@ -121,11 +128,13 @@ def main():
     msg  = "Creating comparison plots (%d) using the following results directories:%s\n\t%s" % (len(opts.dirList), sh_t, "\n\t".join([os.path.basename(d) for d in opts.dirList]) )
     Print(msg + sh_n, True)
     if "output" in opts.plotType.lower():
-        doCompare(opts.saveName, resultsList) 
+        doOutput(opts.saveName, resultsList) 
     elif "efficiency" in opts.plotType.lower():
-        doCompareAlt(opts.saveName, ["Sig", "Bkg"], resultsList)
+        doEfficiency(opts.saveName, resultsList)
     elif "significance" in opts.plotType.lower():
-        doCompareAlt(opts.saveName, ["A", "B"], resultsList) 
+        doSignificance(opts.saveName, resultsList) 
+    elif "roc" in opts.plotType.lower():
+        doROC(opts.saveName, resultsList)
     else:
         pass
     
@@ -133,7 +142,7 @@ def main():
     Print("Plots saved under directory %s"% (sh_s + aux.convertToURL(opts.saveDir, opts.url) + sh_n), True)
     return
 
-def doCompare(name, resultsList):
+def doOutput(name, resultsList):
 
     # Do the comparison plot
     Verbose("Creating the expected plots", True)
@@ -164,22 +173,14 @@ def doCompare(name, resultsList):
     doPlot(legList, gBkgList, opts.saveName + "_Background", **kwargs)
 
     # Do the relative plot
-    Verbose("Creating the relative plots", True)
-    kwargs["ylabel"] = "Ratio"
-    kwargs["opts"]["ymin"] = 0.0
-    kwargs["opts"]["ymax"] = 3.0 #2.0
-    kwargs["log"] = False
-    tdrstyle.TDRStyle().setLogY(False)
-    tdrstyle.TDRStyle().setLogX(opts.logX)
-
-    # Plot the graphs
+    kwargs = GetKwargsRatio(kwargs)
     gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
     gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
     doPlot(legList, gSigList, opts.saveName + "_SignalRel"    , **kwargs)
     doPlot(legList, gBkgList, opts.saveName + "_BackgroundRel", **kwargs)
     return
 
-def doCompareAlt(name, nameExt, resultsList):
+def doEfficiency(name, resultsList):
 
     # Do the comparison plot
     Verbose("Creating the expected plots", True)
@@ -189,8 +190,8 @@ def doCompareAlt(name, nameExt, resultsList):
 
     # For-loop: All Output-class objects
     for r in resultsList:
-        gSig, lSig = r.getGraphs(opts.plotName + nameExt[0])
-        gBkg, lBkg = r.getGraphs(opts.plotName + nameExt[1])
+        gSig, lSig = r.getGraphs(opts.plotName + "Sig")
+        gBkg, lBkg = r.getGraphs(opts.plotName + "Bkg")
         if opts.yMin == None:
             opts.yMin = r.getYMin()
         if opts.yMax == None and opts.yMax == None:
@@ -198,32 +199,115 @@ def doCompareAlt(name, nameExt, resultsList):
         gSigList.extend(gSig)
         gBkgList.extend(gBkg)
         legList.extend(lSig)
-        #legList.extend(lBkg) # same as "lSig"
         
     # Re-arrange legend
     legList.insert(0, legList.pop(opts.refIndex))
     gSigList.insert(0, gSigList.pop(opts.refIndex))
     gBkgList.insert(0, gBkgList.pop(opts.refIndex))
-    # Plot the graphs
+    # Plot the graph
     kwargs = GetKwargs(opts)
-    doPlot(legList, gSigList, opts.saveName + "_" + nameExt[0], **kwargs)
-    doPlot(legList, gBkgList, opts.saveName + "_" + nameExt[1], **kwargs)
-
+    doPlot(legList, gSigList, opts.saveName + "_Sig", **kwargs)
+    doPlot(legList, gBkgList, opts.saveName + "_Bkg", **kwargs)
+        
     # Do the relative plot
-    Verbose("Creating the relative plots", True)
-    kwargs["ylabel"] = "Ratio"
-    kwargs["opts"]["ymin"] = 0.0
-    kwargs["opts"]["ymax"] = 3.0 #2.0
-    dh = -0.12 + (len(opts.dirList)-3)*0.04
-    kwargs["moveLegend"]   = {"dx": -0.53, "dy": -0.05, "dh": dh} 
-    kwargs["log"] = False
-    tdrstyle.TDRStyle().setLogY(False)
-    tdrstyle.TDRStyle().setLogX(opts.logX)
-
+    kwargs = GetKwargsRatio(kwargs)
     gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
     gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
-    doPlot(legList, gSigList, opts.saveName + "_" + nameExt[0] + "Rel", **kwargs)
-    doPlot(legList, gBkgList, opts.saveName + "_" + nameExt[1] + "Rel", **kwargs)
+    doPlot(legList, gSigList, opts.saveName + "_SigRel", **kwargs)
+    doPlot(legList, gBkgList, opts.saveName + "_BkgRel", **kwargs)
+    return
+
+def doSignificance(name, resultsList):
+
+    # Do the comparison plot
+    Verbose("Creating the expected plots", True)
+    gSigList = []
+    gBkgList = []
+    legList  = []
+
+    # For-loop: All Output-class objects
+    for r in resultsList:
+        gSig, lSig = r.getGraphs(opts.plotName + "A")
+        gBkg, lBkg = r.getGraphs(opts.plotName + "B")
+        if opts.yMin == None:
+            opts.yMin = r.getYMin()
+        if opts.yMax == None and opts.yMax == None:
+            opts.yMax = r.getYMax()*1.10
+        gSigList.extend(gSig)
+        gBkgList.extend(gBkg)
+        legList.extend(lSig)
+        
+    # Re-arrange legend
+    legList.insert(0, legList.pop(opts.refIndex))
+    gSigList.insert(0, gSigList.pop(opts.refIndex))
+    gBkgList.insert(0, gBkgList.pop(opts.refIndex))
+    # Plot the graph
+    kwargs = GetKwargs(opts)
+
+    # Default definition
+    kwargs["ylabel"] = "S/#sqrt{S+B}"
+    doPlot(legList, gSigList, opts.saveName + "_A", **kwargs)
+
+    # Alternative definition
+    kwargs["ylabel"] = "2(#sqrt{S+B} - #sqrt{B})"
+    doPlot(legList, gBkgList, opts.saveName + "_B", **kwargs)
+        
+    # Do the relative plot
+    kwargs = GetKwargsRatio(kwargs)
+    gSigList = GetRelativeGraphs(gSigList, opts.refIndex)
+    gBkgList = GetRelativeGraphs(gBkgList, opts.refIndex)
+    doPlot(legList, gSigList, opts.saveName + "_ARel", **kwargs)
+    doPlot(legList, gBkgList, opts.saveName + "_BRel", **kwargs)
+    return
+
+def doROC(name, resultsList):
+    
+    # Do the comparison plot
+    Verbose("Creating the expected plots", True)
+    gSigList = []
+    gBkgList = []
+    legList  = []
+    gSvBList = []
+
+    # For-loop: All Output-class objects
+    for r in resultsList:
+        gSig, lSig = r.getGraphs("EfficiencySig")
+        gBkg, lBkg = r.getGraphs("EfficiencyBkg")
+        if opts.yMin == None:
+            opts.yMin = r.getYMin()
+        if opts.yMax == None and opts.yMax == None:
+            opts.yMax = r.getYMax()*1.10
+        gSigList.extend(gSig)
+        gBkgList.extend(gBkg)
+        legList.extend(lSig)
+        
+    # Re-arrange legend
+    legList.insert(0, legList.pop(opts.refIndex))
+    gSigList.insert(0, gSigList.pop(opts.refIndex))
+    gBkgList.insert(0, gBkgList.pop(opts.refIndex))
+
+    # Plot the graph
+    kwargs = GetKwargs(opts)
+    # For-loop: All TGraphs
+    for i, g in enumerate(gSigList, 0):
+        x  = []
+        y  = []
+        N  = gSigList[i].GetN()
+        nS = gSigList[i].GetName()
+        nB = gBkgList[i].GetName()
+        Verbose("nS = %s, nB = %s" % (nS, nB), True)
+
+        # For-loop: All points in graph
+        for j in range(0, N):
+            x.append(gSigList[i].GetY()[j])
+            y.append(gBkgList[i].GetY()[j])
+
+        # Create the TGraph
+        g = ROOT.TGraph(N, array.array('d', x), array.array('d',y))
+        gSvBList.append(g)
+
+    # Make the plot
+    doPlot(legList, gSvBList, opts.saveName, **kwargs)
     return
 
 def doPlot(legList, graphList, saveName, **kwargs):
@@ -256,12 +340,6 @@ def doPlot(legList, graphList, saveName, **kwargs):
         r = h.getRootHisto()
         r.SetLineWidth(3)
         r.SetMarkerSize(1.2)
-        #if "signal" in saveName.lower():
-        #    r.SetLineStyle(ROOT.kSolid)
-        #elif "background" in saveName.lower():
-        #    r.SetLineStyle(ROOT.kDotted)
-        #else:
-        #    r.SetLineStyle(ROOT.kDashDotted)
         return
 
     # Apply style and set label
@@ -270,12 +348,23 @@ def doPlot(legList, graphList, saveName, **kwargs):
 
     # Draw the plot
     plots.drawPlot(plot, saveName, **kwargs)
+    if opts.removeLegend:
+        plot.removeLegend()
 
     # Save plots and return
     SavePlot(plot, opts.saveDir, saveName, opts.saveFormats)
     
     Verbose("Plots saved under directory %s"% (sh_s + aux.convertToURL(opts.saveDir, opts.url) + sh_n), True)
     return
+
+
+def GetKwargsRatio(kwargs):
+    kwargs["ylabel"] = "Ratio"
+    kwargs["opts"]["ymin"] = 0.0
+    kwargs["opts"]["ymax"] = 3.0
+    kwargs["log"] = False
+    tdrstyle.TDRStyle().setLogY(False)
+    return kwargs
 
 def GetKwargs(opts):
     dh = -0.12 + (len(opts.dirList)-3)*0.04
@@ -308,7 +397,8 @@ def GetKwargs(opts):
         "cutBox"           : {"cutValue":  0.0, "fillColor": 16, "box": False, "line": False , "cutGreaterThan": False},
         #"cutBoxY"          : {"cutValue": 1000.0, "fillColor": 16, "box": False, "line": True, "cutGreaterThan": False}  # does not work!
         }
-            
+
+    # General settings
     if opts.yMaxFactor:
         kwargs["opts"]["ymaxfactor"] = opts.yMaxFactor
         del kwargs["opts"]["ymax"]
@@ -320,19 +410,20 @@ def GetKwargs(opts):
         msg = "Cannot have log-x enabled and y-min set to <=0.0. Setting to x-min to 1e-2"
         Print(sh_h + msg + sh_n, True)
         kwargs["opts"]["xmin"] = 1e-2
-
     if opts.cutLineX != None:
         kwargs["cutBox"]  = {"cutValue": opts.cutLineX, "fillColor": 16, "box": False, "line": True , "cutGreaterThan": False}
     if opts.cutLineY != None:
         Print("This does not work! Bug-fixing required!", True)
         kwargs["cutBoxY"] = {"cutValue": opts.cutLineY, "fillColor": 16, "box": True, "line": True, "cutGreaterThan": False} 
 
+    # Plot-type specific
     if opts.plotType == "efficiency":
         kwargs["ylabel"] = "Efficiency"
-
     if opts.plotType == "significance":
-        #kwargs["moveLegend"] = legSW
-        pass
+        kwargs["ylabel"] = "Significance"
+    if opts.plotType == "roc":
+        kwargs["ylabel"] = "background efficiency"
+        kwargs["xlabel"] = "signal efficiency"
 
     return kwargs
 
@@ -386,6 +477,7 @@ if __name__ == "__main__":
     CUTLINEY     = None
     REFINDEX     = 0
     EXCLUDE      = ""
+    REMOVELEGEND = False
     GRIDX        = False
     GRIDY        = False
     RESULTSJSON  = "results.json"
@@ -449,6 +541,9 @@ if __name__ == "__main__":
     parser.add_option("--logY", dest="logY", action="store_true", default=LOGY,
                       help="Plot y-axis (exlusion limit) as logarithmic [default: %s]" % (LOGY) )
     
+    parser.add_option("--removeLegend", dest="removeLegend", default=REMOVELEGEND, action="store_true",
+                      help="Remove the legend from the canvas? (cleaner canvas) [default: %s]" % (REMOVELEGEND) )
+
     parser.add_option("--gridX", dest="gridX", default=GRIDX, action="store_true",
                       help="Enable the grid for the x-axis [default: %s]" % (GRIDX) )
 
@@ -544,7 +639,7 @@ if __name__ == "__main__":
         Verbose("index = %d, dir = %s" % (i, d), i==0)
         
     # Check plot type
-    plotTypes = ["output", "prediction", "training", "testing", "efficiency", "significance"]
+    plotTypes = ["output", "prediction", "training", "testing", "efficiency", "significance", "roc"]
     plotNames = {}
     plotNames["output"]       = "Output"
     plotNames["prediction"]   = "OutputPred"
@@ -552,6 +647,7 @@ if __name__ == "__main__":
     plotNames["testing"]      = "OutputTest"
     plotNames["efficiency"]   = "Efficiency"
     plotNames["significance"] = "Significance"
+    plotNames["roc"]          = "ROC"
 
     if opts.plotType.lower() not in plotTypes:
         msg = "Unsupported plot type  \"%s\". Please select from the following:" % (", ".join(plotTypes))
@@ -563,7 +659,6 @@ if __name__ == "__main__":
     if opts.saveDir == None:
         #opts.saveDir = opts.dirList[0]
         opts.saveDir = aux.getSaveDirPath(opts.dirList[0], prefix="", postfix=opts.plotType)
-
     if opts.saveName == None:
         opts.saveName = opts.plotType
 
