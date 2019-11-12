@@ -20,16 +20,16 @@ EXAMPLES:
 ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
 ./plotOutputs.py -s png --plotType significance --dirs new1,new2 --saveDir /publicweb/a/aattikis/Test --yMin 0.0 --refIndex 3 --yMaxFactor 1.1
 ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --dirs new5,new6,new7,new8 --saveDir /publicweb/a/aattikis/new5_6_7_8
-
-
-LAST USED:
 ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --dirs new5,new6,new7,new8 --saveDir /publicweb/a/aattikis/new5_6_7_8
 ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2,new3 --refIndex 3 --saveDir /publicweb/a/aattikis/Test
 ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 3 --dirs new1,new2,new3 --saveDir /publicweb/a/aattikis/Test 
 ./plotOutputs.py -s png --logY --plotType output --dirs new1,new2,new3,new4 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType efficiency --yMin 0.0 --yMax 1.0 --dirs new1,new2,new3,new4 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 8 --dirs new1,new2,new3,new4 --saveDir /publicweb/a/aattikis/Test
-
 ./plotOutputs.py -s png --logY --plotType output --dirs new1,new8,new9 --refIndex 0 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType efficiency --dirs new1,new8,new9 --refIndex 8 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 0 --dirs new1,new8,new9 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType roc --logY --dirs new1,new8,new9 --saveDir /publicweb/a/aattikis/Test
 
+
+LAST USED:
+./plotOutputs.py -s png --logY --plotType output --dirs new10,new11 --refIndex 0 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType efficiency --dirs new10,new11 --refIndex 0 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType significance --yMin 0.0 --yMaxFactor 1.1 --refIndex 0 --dirs new10,new11 --saveDir /publicweb/a/aattikis/Test && ./plotOutputs.py -s png --plotType roc --logY --dirs new10,new11 --saveDir /publicweb/a/aattikis/Test
+./plotOutputs.py -s png --plotType roc --logY -saveDir /publicweb/a/aattikis/Test --logX --xMin 0.6 --yMin 6e-3 --yMax 1e-1 --dirs new2,new8,new9,new10,new11
 
 
 
