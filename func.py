@@ -10,6 +10,15 @@ import json
 #================================================================================================   
 # Function definition
 #================================================================================================   
+def Print(msg, printHeader=False):
+    fName = __file__.split("/")[-1]
+    if printHeader==True:
+        print "=== ", fName
+        print "\t", msg
+    else:
+        print "\t", msg
+    return
+   
 def convertHistoToGaph(histo, verbose=False):
                                                                                                                                                                                                             
     # Lists for values
@@ -623,5 +632,5 @@ def WriteModel(model, model_json, output):
                 # Store bias values (shifts the activation function : output[i] = (Sum(weights[i,j]*inputs[j]) + bias[i]))
                 biases = model.layers[index].get_weights()[1]
                 fout.write(str(biases) + '\n')
-        print 'Writing model in', output
+        Print('Writing model in file %s' % (output), True)
         return
