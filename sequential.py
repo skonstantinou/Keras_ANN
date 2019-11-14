@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 '''
 DESCRIPTION:
-Keras is a modular, powerful and intuitive open-source Deep Learning library built on Theano and TensorFlow. Thanks to its minimalist, user-friendly interface, it has become one of the most popular packages to build, train and test neural networks. This script provides an interface for conducting deep learning studies in python with Keras. The step included are:
+Keras is a modular, powerful and intuitive open-source Deep Learning library built on Theano and TensorFlow. 
+Thanks to its minimalist, user-friendly interface, it has become one of the most popular packages to build, 
+train, and test neural networks. This script provides an interface for conducting deep learning studies in 
+python with Keras. The step included are:
 1. Load Data.
 2. Define Keras Model.
 3. Compile Keras Model.
@@ -10,22 +13,25 @@ Keras is a modular, powerful and intuitive open-source Deep Learning library bui
 6. Tie It All Together.
 7. Make Predictions
 
-
 ENV SETUP:
 cd ~/scratch0/CMSSW_10_2_11/src/ && cmsenv && setenv SCRAM_ARCH slc7_amd64_gcc700 && cd /afs/cern.ch/user/a/attikis/workspace/Keras_ANN/
 
 
 OPTIMISATION:
-Basically it is just trial and error. The number of layers and the number of nodes in Keras (aka "hyperparameters") should be tuned on a validation set (split from your original data into train/validation/test).
-Tuning just means trying different combinations of parameters and keep the one with the lowest loss value or better accuracy on the validation set, depending on the problem.
+In two words; trial & error. 
+The number of layers and the number of nodes in Keras (aka "hyperparameters") should be tuned on a validation set 
+(split from your original data into train/validation/test). Tuning just means trying different combinations of parameters
+ and keep the one with the lowest loss value or better accuracy on the validation set, depending on the problem. 
 There are two basic methods:
-Grid search: For each parameter, decide a range and steps into that range, like 8 to 64 neurons, in powers of two (8, 16, 32, 64), and try each combination of the parameters. 
-Random search: Do the same but just define a range for each parameter and try a random set of parameters, drawn from an uniform distribution over each range. 
-Unfortunately there is no other way to tune such parameters. Just keep in mind that a deep model provides a hierarchy of layers that build up increasing levels of abstraction 
-from the space of the input variables to the output variables.
-About layers having different number of neurons, that could come from the tuning process, or you can also see it as dimensionality reduction, like a compressed version of the previous layer.
-https://stackoverflow.com/questions/36950394/how-to-decide-the-size-of-layers-in-keras-dense-method
-https://machinelearningmastery.com/how-to-configure-the-number-of-layers-and-nodes-in-a-neural-network/
+1) Grid search: For each parameter, decide a range and steps into that range, like 8 to 64 neurons, in powers of two 
+(e.g. 8, 16, 32, 64), and try each combination of the parameters. 
+2) Random search: Do the same but just define a range for each parameter and try a random set of parameters, drawn from 
+an uniform distribution over each range.
+Unfortunately there is no other way to tune such parameters. Just keep in mind that a deep model provides a hierarchy of 
+layers that build up increasing levels of abstraction from the space of the input variables to the output variables.
+
+About layers having different number of neurons, that could come from the tuning process, or you can also see it as 
+dimensionality reduction, like a compressed version of the previous layer.
 
 
 USAGE:
@@ -52,6 +58,11 @@ https://github.com/attikis/Keras_ANN
 
 URL:
 https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw <----- Really good
+https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6
+https://theffork.com/activation-functions-in-neural-networks/?source=post_page-----4dfb9c7ce9c9----------------------
+https://github.com/Kulbear/deep-learning-nano-foundation/wiki/ReLU-and-Softmax-Activation-Functions
+https://stackoverflow.com/questions/36950394/how-to-decide-the-size-of-layers-in-keras-dense-method
+https://machinelearningmastery.com/how-to-configure-the-number-of-layers-and-nodes-in-a-neural-network/
 https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
 https://keras.io/activations/
 https://keras.io/getting-started/
@@ -137,6 +148,38 @@ def GetTime(tStart):
     secs    = mins[1]               # seconds
     return days, hours, mins, secs
 
+def printDataset(myDset):
+    Verbose("%sPrinting 1 instance of the Numpy representation of the DataFrame%s:" % (ns, es), True)
+
+    # For-loop: All TBranch entries
+    for vList in myDset:
+        # For-loop: All input variable values for given entry
+        for v in vList:
+            Verbose(v, False)
+        break
+    return
+
+def checkNeuronsPerLayer(nsignal, opts):
+    '''
+    https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw
+    '''
+    # For-loop: All neurons
+    for i, o in enumerate(opts.neurons, 1):
+        # Skip first (input layer) and last (output) layers (i.e. do only hidden layers)
+        if i==0 or i>=len(opts.neurons)-1:
+            continue
+        
+        # Determine in/out neurons and compare to min-max range allowed
+        nIn  = opts.neurons[-1]
+        nOut = opts.neurons[i]
+        dof  = (2*nsignal) * (nIn + nOut)     # 2*nsignal = number of samples in training data set
+        nMax = (2*nsignal) / (2*(nIn + nOut))
+        nMin = (2*nsignal) / (10*(nIn + nOut))
+        if nOut > nMax or nOut < nMin:
+            msg = "The number of OUT neurons for layer #%d (IN=%d, OUT=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nOut, nMin, nMax)
+            Print(hs + msg + ns, True)
+    return
+
 def writeCfgFile(opts):
 
     # Write to json file
@@ -146,6 +189,7 @@ def writeCfgFile(opts):
     jsonWr.addParameter("host name", opts.hostname)
     jsonWr.addParameter("python version", opts.python)
     jsonWr.addParameter("model", "sequential")
+    jsonWr.addParameter("rndSeed", opts.rndSeed)
     jsonWr.addParameter("layers", len(opts.neurons))
     jsonWr.addParameter("hidden layers", len(opts.neurons)-2)
     jsonWr.addParameter("activation functions", [a for a in opts.activation])
@@ -154,6 +198,8 @@ def writeCfgFile(opts):
     jsonWr.addParameter("optimizer", opts.optimizer)
     jsonWr.addParameter("epochs", opts.epochs)
     jsonWr.addParameter("batch size", opts.batchSize)
+    jsonWr.addParameter("train sample", opts.trainSample)
+    jsonWr.addParameter("test sample" , opts.testSample)
     
     #for i, n in enumerate(opts.neurons, 1):
         #jsonWr.addParameter("layer %d" % (i), "blah")
@@ -182,16 +228,11 @@ def main(opts):
     tStart = time.time()
     Verbose("Started @ " + str(tStart), True)
 
-    # Write a JSON file with model information 
-    #writeCfgFile(opts)
-    #writeGitFile(opts)
-
-    # Do not display canvases
+    # Do not display canvases & disable screen output info
     ROOT.gROOT.SetBatch(ROOT.kTRUE)
-
-    # Disable screen output info
     ROOT.gROOT.ProcessLine( "gErrorIgnoreLevel = 1001;")
 
+    # Setup the style
     style = tdrstyle.TDRStyle() 
     style.setOptStat(False) 
     style.setGridX(opts.gridX)
@@ -200,17 +241,13 @@ def main(opts):
     # Open the ROOT file
     ROOT.TFile.Open(opts.rootFileName)
 
-    if opts.test:
-        opts.epochs    = 10
-        opts.batchSize = 5000
-
     # Setting the seed for numpy-generated random numbers
     numpy.random.seed(opts.rndSeed)
 
     # Setting the seed for python random numbers
     rn.seed(opts.rndSeed)
 
-    # Setting the graph-level random seed.
+    # Setting tensorflow random seed
     tf.set_random_seed(opts.rndSeed)
 
     # Open the signal and background TTrees with uproot (uproot allows one to read ROOT data, in python, without using ROOT)
@@ -241,79 +278,57 @@ def main(opts):
     inputList.append("TrijetSubldgJetMult")
     nInputs = len(inputList)
 
-
     # Construct signal and background dataframes using a list of TBranches (a Dataframe is a two dimensional structure representing data in python)
     Print("Constucting dataframes for signal and background with %d input variables:\n\t%s%s%s" % (nInputs, ss, "\n\t".join(inputList), ns), True)
-    df_signal     = signal.pandas.df(inputList) # call an array-fetching method to fill a Pandas DataFrame.
-    df_background = background.pandas.df(inputList)
+    df_signal = signal.pandas.df(inputList) # call an array-fetching method to fill a Pandas DataFrame.
+    df_bkg    = background.pandas.df(inputList)
 
     # Get the index (row labels) of the DataFrame.
     nsignal = len(df_signal.index)
-    nbkg    = len(df_background.index)
+    nbkg    = len(df_bkg.index)
     Verbose("Signal has %s%d%s row labels. Background has %s%d%s row labels" % (ss, nsignal, ns, es, nbkg, ns), True)
 
-    # Apply rule-of-thumb to prevent over-fitting (https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden-layers-and-nodes-in-a-feedforward-neural-netw)
-    for i, o in enumerate(opts.neurons, 1):
-        # Skip first and last neurons (only hidden layers)
-        if i==0 or i>=len(opts.neurons)-1:
-            continue
-        nIn  = opts.neurons[-1]
-        nOut = opts.neurons[i]
-        dof  = (2*nsignal) * (nIn + nOut)     # 2*nsignal = number of samples in training data set
-        nMax = (2*nsignal) / (2*(nIn + nOut))
-        nMin = (2*nsignal) / (10*(nIn + nOut))
-        if nOut > nMax or nOut < nMin:
-            msg = "The number of OUT neurons for layer #%d (IN=%d, OUT=%d) is not within the recommended range(%d-%d). This may result in over-fitting" % (i, nIn, nOut, nMin, nMax)
-            Print(hs + msg + ns, True)
+    # Apply rule-of-thumb to prevent over-fitting
+    checkNeuronsPerLayer(nsignal, opts)
     
     # Sanity check
     columns = list(df_signal.columns.values)
     Verbose("The signal columns are :\n\t%s%s%s" % (ss, "\n\t".join(columns), ns), True)    
 
     # Get a Numpy representation of the DataFrames for signal and background datasets
-    dset_signal     = df_signal.values
-    dset_background = df_background.values
-    Verbose("Printing 1 instance of the Numpy representation of the signal DataFrame:%s" % (ss), True)
-    # For-loop: All TBranch entries
-    for vList in dset_signal:
-        # For-loop: All input variable values for given entry
-        for v in vList:
-            Verbose(v, False)
-        break
-    Verbose("%sPrinting 1 instance of the Numpy representation of the background DataFrame%s:" % (ns, es), True)
-    # For-loop: All TBranch entries
-    for vList in dset_background:
-        # For-loop: All input variable values for given entry
-        for v in vList:
-            Verbose(v, False)
-        break
+    Print("Getting a Numpy representation of the DataFrames for signal and background datasets", True)
+    dset_signal = df_signal.values
+    dset_bkg    = df_bkg.values
+    printDataset(dset_signal)
+    printDataset(dset_bkg)
 
     # Construct the pandas DataFrames (2D size-mutable tabular data structure with labeled axes i.e. rows and columns)
     Print("Constructing pandas DataFrames for signal and background", True)
-    ds_signal     = pandas.DataFrame(data=dset_signal,columns=inputList)
-    ds_background = pandas.DataFrame(data=dset_background,columns=inputList)
+    ds_signal = pandas.DataFrame(data=dset_signal,columns=inputList)
+    ds_bkg    = pandas.DataFrame(data=dset_bkg,columns=inputList)
 
     # Construct pandas DataFrames (2D size-mutable tabular data structure with labeled axes i.e. rows and columns)
-    df_signal     = df_signal.assign(signal=1)
-    df_background = df_background.assign(signal=0)
+    Print("Constructing pandas DataFrames", True)
+    df_signal = df_signal.assign(signal=1)
+    df_bkg    = df_bkg.assign(signal=0)
     Verbose("Printing tabular data for signal:\n%s%s%s" % (ss, ds_signal,ns), True)
-    Verbose("Printing tabular data for background:\n%s%s%s" % (ss, ds_background,ns), True)
+    Verbose("Printing tabular data for background:\n%s%s%s" % (ss, ds_bkg,ns), True)
     
     # Create dataframe lists
-    df_list = [df_signal, df_background]
+    df_list = [df_signal, df_bkg]
     df_all  = pandas.concat(df_list)
 
     # Get a Numpy representation of the DataFrames for signal and background datasets (again, and AFTER assigning signal and background)
-    dset_signal     = df_signal.values
-    dset_background = df_background.values
-    dset_all        = df_all.values
+    dset_signal = df_signal.values
+    dset_bkg    = df_bkg.values
+    dset_all    = df_all.values
 
     # Define keras model as a linear stack of layers. Add layers one at a time until we are happy with our network architecture.
-    Print("Creating the sequential model", True)
+    Print("Creating the sequential Keras model", True)
     model = Sequential()
 
     # The best network structure is found through a process of trial and error experimentation. Generally, you need a network large enough to capture the structure of the problem.
-    # The Dense function defines each layer - how many neurons and mathematical function to use. (First hidden layer with "36" neurons, "nInputs" inputs, and "relu" as acivation function)
+    # The Dense function defines each layer - how many neurons and mathematical function to use.
     for iLayer, n in enumerate(opts.neurons, 0):
         layer = "%d layer#" % (int(iLayer)+1)
         if iLayer == 0:
@@ -354,25 +369,36 @@ def main(opts):
     X = dset_all[:2*nsignal,0:nInputs] # rows: 0 -> 2*signal, columns: 0 -> 19
     Y = dset_all[:2*nsignal,nInputs:]  # rows: 0 -> 2*signal, columns: 19 (isSignal = 0 or 1)
     X_signal     = dset_signal[:nsignal, 0:nInputs]
-    X_background = dset_background[:nsignal, 0:nInputs]
+    X_background = dset_bkg[:nsignal, 0:nInputs]
     Print("Signal dataset has %s%d%s rows. Background dataset has %s%d%s rows" % (ss, len(X_signal), ns, es, len(X_background), ns), True)
 
     # Split the datasets (X= 19 inputs, Y=output variable). Test size 0.5 means half for training half for testing
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.5, random_state=opts.rndSeed, shuffle=True)
+    opts.testSample  = len(X_test)
+    opts.trainSample = len(X_train)
 
     # Early stop? Stop training when a monitored quantity has stopped improving.
     # Show patience of "50" epochs with a change in the loss function smaller than "min_delta" before stopping procedure
     # https://stackoverflow.com/questions/43906048/keras-early-stopping
-    earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0, patience=10, verbose=1, mode='auto')
-    # earlystop      = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50) #default - soti
-    callbacks_list = [earlystop]
+    earlystop = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0, patience=10, verbose=1, mode='auto')
+    # earlystop = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50)
+    callbacks = [earlystop]
 
     # [Loss function is used to understand how well the network is working (compare predicted label with actual label via some function)]
     # Optimizer function is related to a function used to optimise the weights
-    Print("Compiling the model with the loss function %s and optimizer %s " % (ls + opts.lossFunction + ns, ls + opts.optimizer + ns), True)
-    model.compile(loss=opts.lossFunction, optimizer=opts.optimizer, metrics=['acc'])
+    Print("Compiling the model with the loss function %s and optimizer %s " % (ls + opts.lossFunction + ns, ts + opts.optimizer + ns), True)
+    model.compile(loss=opts.lossFunction, optimizer=opts.optimizer, metrics=['accuracy'])
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     
+    # Customise the optimiser settings?
+    if 0: #opts.optimizer == "adam":  # does not work
+        # Default parameters follow those provided in the original paper.
+        # learning_rate: float >= 0. Learning rate.
+        # beta_1: float, 0 < beta < 1. Generally close to 1.
+        # beta_2: float, 0 < beta < 1. Generally close to 1.
+        # amsgrad: boolean. Whether to apply the AMSGrad variant of this algorithm from the paper "On the Convergence of Adam and Beyond".
+        keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, amsgrad=False)
+
     # batch size equal to the training batch size (See https://machinelearningmastery.com/use-different-batch-sizes-training-predicting-python-keras/)
     if opts.batchSize == None:
         opts.batchSize = len(X_train)/2
@@ -380,32 +406,35 @@ def main(opts):
     # Fit the model with our data
     # (An "epoch" is an arbitrary cutoff, generally defined as "one iteration of training on the whole dataset", 
     # used to separate training into distinct phases, which is useful for logging and periodic evaluation.)
-    hist = model.fit(X_train,
-                     Y_train,
-                     validation_data=(X_test, Y_test),
-                     epochs     = opts.epochs,    # a full pass over all of your training data
-                     batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
-                     shuffle    = False,
-                     verbose    = 1, # 0=silent, 1=progress, 2=mention the number of epoch
-                     #verbose    = int(not opts.log), # 0=silent, 1=progress, 2=mention the number of epoch
-                     callbacks  = callbacks_list
-                 )
+    try:
+        hist = model.fit(X_train,
+                         Y_train,
+                         validation_data=(X_test, Y_test),
+                         epochs     = opts.epochs,    # a full pass over all of your training data
+                         batch_size = opts.batchSize, # a set of N samples (https://stats.stackexchange.com/questions/153531/what-is-batch-size-in-neural-network)
+                         shuffle    = False,
+                         verbose    = 1, # 0=silent, 1=progress, 2=mention the number of epoch
+                         callbacks  = callbacks
+                     )
+    except KeyboardInterrupt: #(KeyboardInterrupt, SystemExit):
+        msg = "Manually interrupted the training (keyboard interrupt)!"
+        Print(es + msg + ns, True)
 
-    if not opts.test:
-        modelName = "Model_%s_trained.h5" % (opts.rootFileName.replace(".root",""))
-        model.save(modelName)
+    # Write the model
+    modelName = "Model_%s_trained.h5" % (opts.rootFileName.replace(".root",""))
+    model.save(modelName)
         
-        # serialize model to JSON (contains arcitecture of model)
-        model_json = model.to_json()
-        with open("model_architecture.json", "w") as json_file:
-            json_file.write(model_json)
+    # serialize model to JSON (contains arcitecture of model)
+    model_json = model.to_json()
+    with open("model_architecture.json", "w") as json_file:
+        json_file.write(model_json)
         
-        # serialize weights to HDF5
-        model.save_weights('model_weights.h5', overwrite=True)
-        model.save(modelName)
+    # serialize weights to HDF5
+    model.save_weights('model_weights.h5', overwrite=True)
+    model.save(modelName)
         
-        # write weights and architecture in txt file
-        func.WriteModel(model, model_json, os.path.join(opts.saveDir, "model.txt") )
+    # write weights and architecture in txt file
+    func.WriteModel(model, model_json, os.path.join(opts.saveDir, "model.txt") )
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
     # https://stackoverflow.com/questions/49288199/batch-size-in-model-fit-and-model-predict
@@ -413,9 +442,8 @@ def main(opts):
     pred_train  = model.predict(X_train     , batch_size=None, verbose=1, steps=None)
     pred_test   = model.predict(X_test      , batch_size=None, verbose=1, steps=None)
     pred_signal = model.predict(X_signal    , batch_size=None, verbose=1, steps=None)
-    pred_bkg    = model.predict(X_background, batch_size=None, verbose=1, steps=None)
-    # Keras version 2.2.5 or later (https://keras.io/models/model/)
-    # pred_train      = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
+    pred_bkg    = model.predict(X_background, batch_size=None, verbose=1, steps=None)    
+    # pred_train = model.predict(x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False) # Keras version 2.2.5 or later (https://keras.io/models/model/)
 
     # Join a sequence of arrays (X and Y) along an existing axis (1). In other words, add the ouput variable (Y) to the input variables (X)
     XY_train = numpy.concatenate((X_train, Y_train), axis=1)
@@ -470,6 +498,12 @@ def main(opts):
     func.PlotTGraph(xVals, xErrs, sig_def, effErrs_B, opts.saveDir, "SignificanceA", jsonWr, opts.saveFormats)
     func.PlotTGraph(xVals, xErrs, sig_alt, effErrs_B, opts.saveDir, "SignificanceB", jsonWr, opts.saveFormats)
 
+    # Plot ROC curve
+    graph1 = func.GetROC(htest_s, htest_b)
+    graph2 = func.GetROC(htest_b, htest_s)
+    graph_roc = {"graph" : [graph1, graph2], "name" : ["graph 1", "graph 2"]}
+    func.PlotROC(graph_roc, opts.saveDir, "ROC", opts.saveFormats)
+
     # Write the  resultsJSON file!
     jsonWr.write(opts.resultsJSON)
     
@@ -506,7 +540,6 @@ if __name__ == "__main__":
     SAVEFORMATS  = "png"
     URL          = False
     VERBOSE      = False
-    TEST         = False
     RNDSEED      = 1234
     EPOCHS       = 100
     BATCHSIZE    = None  # See: http://stats.stackexchange.com/questions/153531/ddg#153535
@@ -528,9 +561,6 @@ if __name__ == "__main__":
 
     parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=VERBOSE, 
                       help="Enable verbose mode (for debugging purposes mostly) [default: %s]" % VERBOSE)
-
-    parser.add_option("--test", dest="test", action="store_true", default=TEST, 
-                      help="Enable test mode [default: %s]" % TEST)
 
     parser.add_option("--rootFileName", dest="rootFileName", type="string", default=ROOTFILENAME, 
                       help="Input ROOT file containing the signal and backbground TTrees with the various TBrances *variables) [default: %s]" % ROOTFILENAME)
@@ -566,7 +596,7 @@ if __name__ == "__main__":
                       help="List of neurons to use for each sequential layer (comma-separated integers)  [default: %s]" % NEURONS)
 
     parser.add_option("--lossFunction", dest="lossFunction", type="string", default=LOSSFUNCTION,
-                      help="Name of loss function; one of the two parameters required to compile a model: [default: %s]" % LOSSFUNCTION)
+                      help="One of the two parameters required to compile a model. The weights will take on values such that the loss function is minimized [default: %s]" % LOSSFUNCTION)
 
     parser.add_option("--optimizer", dest="optimizer", type="string", default=OPTIMIZER,
                       help="Name of optimizer function; one of the two parameters required to compile a model: [default: %s]" % OPTIMIZER)
@@ -681,7 +711,7 @@ if __name__ == "__main__":
 
     # See https://keras.io/activations/
     actList = ["elu", "softmax", "selu", "softplus", "softsign", "PReLU", "LeakyReLU",
-               "relu", "tanh", "sigmoid", "hard_sigmoid", "exponential", "linear"] # Loukas used "relu"
+               "relu", "tanh", "sigmoid", "hard_sigmoid", "exponential", "linear"] # Loukas used "relu" for resolved top tagger
     # Sanity checks
     for a in opts.activation:
         if a not in actList:
@@ -689,15 +719,22 @@ if __name__ == "__main__":
             raise Exception(es + msg + ns)    
     
     # See https://keras.io/losses/
-    lossList = ["mean_squared_error", "mean_absolute_error", "mean_absolute_percentage_error", "mean_squared_logarithmic_error", "squared_hinge",
-                "hinge", "categorical_hinge", "logcosh", "huber_loss", "categorical_crossentropy", "sparse_categorical_crossentropy", "binary_crossentropy", 
-                "kullback_leibler_divergenc", "poisson", "cosine_proximity", "is_categorical_crossentropy"]
+    lossList = ["binary_crossentropy", "is_categorical_crossentropy",
+                "mean_squared_error", "mean_absolute_error", "mean_absolute_percentage_error", "mean_squared_logarithmic_error", "squared_hinge",
+                "hinge", "categorical_hinge", "logcosh", "huber_loss", "categorical_crossentropy", "sparse_categorical_crossentropy", 
+                "kullback_leibler_divergenc", "poisson", "cosine_proximity"]
+    bLossList = ["binary_crossentropy", "is_categorical_crossentropy"]
     # Sanity checks
     if opts.lossFunction not in lossList:
         msg = "Unsupported loss function %s. Please select on of the following:%s\n\t%s" % (opts.lossFunction, ss, "\n\t".join(lossList))
         raise Exception(es + msg + ns)    
+    elif opts.lossFunction not in bLossList:
+        msg = "Binary output currently only supports the following loss fucntions: %s" % ", ".join(bLossList)
+        raise Exception(es + msg + ns)
+    else:
+        pass
 
-    # See https://keras.io/optimizers/
+    # See https://keras.io/optimizers/. Also https://www.dlology.com/blog/quick-notes-on-how-to-choose-optimizer-in-keras/
     optList = ["sgd", "rmsprop", "adagrad", "adadelta", "adam", "adamax", "nadam"]
     # optList = ["SGD", "RMSprop", "Adagrad", "Adadelta", "Adam", "Adamax", "Nadam"]
     # Sanity checks
@@ -716,7 +753,7 @@ if __name__ == "__main__":
         msg = "The NN has %s%d hidden layers%s (in addition to input and output layers)." % (hs, opts.nHiddenLayers, ns)
         Print(msg, True) 
         msg = "[NOTE: One hidden layer is sufficient for the large majority of problems. In general, the optimal size of the hidden layer is usually between the size of the input and size of the output layers.]"
-        Print(msg, False)         
+        Verbose (msg, False)         
 
     # Get some basic information
     opts.keras     = keras.__version__

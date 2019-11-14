@@ -70,9 +70,49 @@
 # nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,19,1 --epochs 1000 --batchSize 32 --log -s pdf &
 
 # v6
-for n in 19 19*2 19*3 19*5 19*10 19*100; do
-    echo "=== Neurons = ${n}"
-    sleep 15
-    nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,${n},1 --epochs 1000 --batchSize 32 --log -s pdf &
-done
+# for n in 19 38 57 95 190 1900; do
+#     echo "=== Neurons = ${n}"
+#     sleep 15
+#     nohup ./sequential.py --activation relu,relu,sigmoid --neurons 19,${n},1 --epochs 1000 --batchSize 32 --log -s pdf &
+# done
 
+# v7
+# for bs in 16 32 64 128 256; do 
+#     echo "=== BatchSize = ${bs}"
+#     sleep 15
+#     nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,19,1 --epochs 1000 --batchSize ${bs} --log -s pdf &
+# done
+
+# v8
+#nohup ./sequential.py --activation tanh,tanh,tanh,tanh,tanh,tanh,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf &
+
+# v9
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "mean_squared_error" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "mean_absolute_error" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "mean_absolute_percentage_error" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "mean_squared_logarithmic_error" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "squared_hinge" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "hinge" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "categorical_hinge" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "logcosh" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "huber_loss" & 
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "categorical_crossentropy" & 
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "sparse_categorical_crossentropy" & 
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "binary_crossentropy" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "kullback_leibler_divergenc" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "poisson" "cosine_proximity" &
+sleep 20
+nohup ./sequential.py --activation relu,relu,relu,relu,relu,relu,sigmoid --neurons 19,500,250,125,60,30,1 --epochs 1000 --batchSize 32 --log -s pdf --lossFunction "is_categorical_crossentropy" &
