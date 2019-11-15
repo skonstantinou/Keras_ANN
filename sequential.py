@@ -200,9 +200,7 @@ def writeCfgFile(opts):
     jsonWr.addParameter("batch size", opts.batchSize)
     jsonWr.addParameter("train sample", opts.trainSample)
     jsonWr.addParameter("test sample" , opts.testSample)
-    
-    #for i, n in enumerate(opts.neurons, 1):
-        #jsonWr.addParameter("layer %d" % (i), "blah")
+    jsonWr.addParameter("ROOT file" , opts.rootFileName)
     jsonWr.write(opts.cfgJSON)
     return
 
@@ -264,7 +262,7 @@ def main(opts):
     inputList.append("TrijetSubldgJetBDisc")
     inputList.append("TrijetBJetLdgJetMass")
     inputList.append("TrijetBJetSubldgJetMass")
-    inputList.append("TrijetMass")
+    #inputList.append("TrijetMass")
     inputList.append("TrijetDijetMass")
     inputList.append("TrijetBJetBDisc")
     inputList.append("TrijetSoftDrop_n2")
@@ -296,19 +294,19 @@ def main(opts):
     Verbose("The signal columns are :\n\t%s%s%s" % (ss, "\n\t".join(columns), ns), True)    
 
     # Get a Numpy representation of the DataFrames for signal and background datasets
-    Print("Getting a Numpy representation of the DataFrames for signal and background datasets", True)
+    Verbose("Getting a numpy representation of the DataFrames for signal and background datasets", True)
     dset_signal = df_signal.values
     dset_bkg    = df_bkg.values
     printDataset(dset_signal)
     printDataset(dset_bkg)
 
     # Construct the pandas DataFrames (2D size-mutable tabular data structure with labeled axes i.e. rows and columns)
-    Print("Constructing pandas DataFrames for signal and background", True)
+    Verbose("Constructing pandas DataFrames for signal and background", True)
     ds_signal = pandas.DataFrame(data=dset_signal,columns=inputList)
     ds_bkg    = pandas.DataFrame(data=dset_bkg,columns=inputList)
 
     # Construct pandas DataFrames (2D size-mutable tabular data structure with labeled axes i.e. rows and columns)
-    Print("Constructing pandas DataFrames", True)
+    Verbose("Constructing pandas DataFrames", True)
     df_signal = df_signal.assign(signal=1)
     df_bkg    = df_bkg.assign(signal=0)
     Verbose("Printing tabular data for signal:\n%s%s%s" % (ss, ds_signal,ns), True)
@@ -534,7 +532,8 @@ if __name__ == "__main__":
     '''
     
     # Default Settings
-    ROOTFILENAME = "histograms-TT_19var.root"
+    #ROOTFILENAME = "histograms-TT_19var.root"
+    ROOTFILENAME = "histograms-TT_19var_6Jets_2BJets.root"
     NOTBATCHMODE = False
     SAVEDIR      = None
     SAVEFORMATS  = "png"
@@ -685,7 +684,7 @@ if __name__ == "__main__":
         os.mkdir(opts.saveDir)
 
     # Create logfile
-    opts.logFile = sName + ".log"
+    opts.logFile = "stdout.log" #sName + ".log"
     opts.logPath = os.path.join(opts.saveDir, opts.logFile)    
     bak_stdout   = sys.stdout
     log_file     = None
