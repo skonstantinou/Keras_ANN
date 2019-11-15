@@ -473,7 +473,8 @@ def PlotROC(graphMap, saveDir, saveName, saveFormats):
 
     leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
 
-    for i in range(len(graphMap)):
+    # For-loop: All graphs
+    for i, k in enumerate(graphMap["graph"], 0):
         gr = graphMap["graph"][i]
         gr_name = graphMap["name"][i]
         plot.ApplyStyle(gr, i+2)

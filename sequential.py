@@ -339,7 +339,7 @@ def main(opts):
         Print("Adding %s, with %s%d neurons%s and activation function %s" % (ts + layer + ns, ls, n, ns, ls + opts.activation[iLayer] + ns), i==0)
         if iLayer == 0:
             if opts.neurons[iLayer] != nInputs > 1:
-                msg = "The number of neurons must equal the number of features (colimns) in your data. Some NN configuration add one additional node for a bias term"
+                msg = "The number of neurons must equal the number of features (columns) in your data. Some NN configuration add one additional node for a bias term"
                 Print(msg, True)
             # Only first layer demands input_dim. For the rest it is implied.
             model.add( Dense(opts.neurons[iLayer], input_dim = nInputs) )
@@ -497,10 +497,14 @@ def main(opts):
     func.PlotTGraph(xVals, xErrs, sig_alt, effErrs_B, opts.saveDir, "SignificanceB", jsonWr, opts.saveFormats)
 
     # Plot ROC curve
-    graph1 = func.GetROC(htest_s, htest_b)
-    graph2 = func.GetROC(htest_b, htest_s)
-    graph_roc = {"graph" : [graph1, graph2], "name" : ["graph 1", "graph 2"]}
-    func.PlotROC(graph_roc, opts.saveDir, "ROC", opts.saveFormats)
+    gSig = func.GetROC(htest_s, htest_b)
+    if 0:
+        gBkg = func.GetROC(htest_b, htest_s)
+        gDict = {"graph" : [gSig, gBkg], "name" : ["signal", "bkg"]}
+    else:
+        gDict = {"graph" : [gSig], "name" : [os.path.basename(opts.saveDir)]}
+    style.setLogY(True)
+    func.PlotROC(gDict, opts.saveDir, "ROC", opts.saveFormats)
 
     # Write the  resultsJSON file!
     jsonWr.write(opts.resultsJSON)
@@ -532,8 +536,8 @@ if __name__ == "__main__":
     '''
     
     # Default Settings
-    #ROOTFILENAME = "histograms-TT_19var.root"
-    ROOTFILENAME = "histograms-TT_19var_6Jets_2BJets.root"
+    ROOTFILENAME = "histograms-TT_19var.root"
+    #ROOTFILENAME = "histograms-TT_19var_6Jets_2BJets.root"
     NOTBATCHMODE = False
     SAVEDIR      = None
     SAVEFORMATS  = "png"
