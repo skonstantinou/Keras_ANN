@@ -34,6 +34,24 @@ About layers having different number of neurons, that could come from the tuning
 dimensionality reduction, like a compressed version of the previous layer.
 
 
+ACTIVATION FUNCTIONS:
+Activation functions are really important for a Artificial Neural Network to learn and make sense of something really 
+complicated and Non-linear complex functional mappings between the inputs and response variable. They introduce non-linear
+properties to our Network.Their main purpose is to convert a input signal of a node in a A-NN to an output signal. 
+That output signal now is used as a input in the next layer in the stack. Specifically in A-NN we do the sum of products of
+inputs (x_{i}) and their corresponding Weights(w_{i}) and apply a Activation function f(x_{i}) to it to get the output of that 
+layer and feed it as an input to the next layer. The question arises that why can't we do it without activating the input signal?
+If we do not apply a Activation function then the output signal would simply be a simple linear function.A linear function is 
+just a polynomial of one degree. Now, a linear equation is easy to solve but they are limited in their complexity and have less 
+power to learn complex functional mappings from data. A Neural Network without Activation function would simply be a Linear 
+regression Model, which has limited power and does not perform good most of the times. We want our Neural Network to not just 
+learn and compute a linear function but something more complicated than that. Also without activation function our Neural network
+ would not be able to learn and model other complicated kinds of data such as images, videos , audio , speech etc. That is why
+ we use Artificial Neural network techniques such as Deep learning to make sense of something complicated ,high dimensional, 
+non-linear -big datasets, where the model has lots and lots of hidden layers in between and has a very complicated architecture
+ which helps us to make sense and extract knowledge form such complicated big datasets.
+
+
 USAGE:
 ./sequential.py [opts]
 
@@ -61,6 +79,8 @@ https://stats.stackexchange.com/questions/181/how-to-choose-the-number-of-hidden
 https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6
 https://theffork.com/activation-functions-in-neural-networks/?source=post_page-----4dfb9c7ce9c9----------------------
 https://github.com/Kulbear/deep-learning-nano-foundation/wiki/ReLU-and-Softmax-Activation-Functions
+https://ml-cheatsheet.readthedocs.io/en/latest/loss_functions.html
+https://gombru.github.io/2018/05/23/cross_entropy_loss/
 https://stackoverflow.com/questions/36950394/how-to-decide-the-size-of-layers-in-keras-dense-method
 https://machinelearningmastery.com/how-to-configure-the-number-of-layers-and-nodes-in-a-neural-network/
 https://machinelearningmastery.com/tutorial-first-neural-network-python-keras/
@@ -138,6 +158,17 @@ def Verbose(msg, printHeader=True, verbose=False):
         return
     Print(msg, printHeader)
     return
+
+def CrossEntropy(yHat, y):
+    ''' 
+    For future class implementation
+
+    https://ml-cheatsheet.readthedocs.io/en/latest/loss_functions.html
+    ''' 
+    if y == 1:
+      return -log(yHat)
+    else:
+      return -log(1 - yHat)
 
 def GetTime(tStart):
     tFinish = time.time()
@@ -342,7 +373,7 @@ def main(opts):
                 msg = "The number of neurons must equal the number of features (columns) in your data. Some NN configuration add one additional node for a bias term"
                 Print(msg, True)
             # Only first layer demands input_dim. For the rest it is implied.
-            model.add( Dense(opts.neurons[iLayer], input_dim = nInputs) )
+            model.add( Dense(opts.neurons[iLayer], input_dim = nInputs) ) #, weights = [np.zeros([692, 50]), np.zeros(50)] OR bias_initializer='zeros',  or bias_initializer=initializers.Constant(0.1)
             model.add(Activation(opts.activation[iLayer]))
             #model.add( Dense(opts.neurons[iLayer], input_dim = nInputs, activation = opts.activation[iLayer]) ) # her majerty Soti requested to break this into 2 lines
         else:
@@ -536,8 +567,9 @@ if __name__ == "__main__":
     '''
     
     # Default Settings
-    ROOTFILENAME = "histograms-TT_19var.root"
+    #ROOTFILENAME = "histograms-TT_19var.root"
     #ROOTFILENAME = "histograms-TT_19var_6Jets_2BJets.root"
+    ROOTFILENAME = "histograms-TT_19var_5Jets_1BJets.root"
     NOTBATCHMODE = False
     SAVEDIR      = None
     SAVEFORMATS  = "png"
@@ -590,7 +622,7 @@ if __name__ == "__main__":
                       help="Number of \"epochs\" to be used (how many times you go through your training set) [default: %s]" % EPOCHS)
 
     parser.add_option("--batchSize", dest="batchSize", type=int, default=BATCHSIZE,
-                      help="The \"batch size\" to be used (= a number of samples processed before the model is updated). Batch size impacts learning significantly; typically networks trains faster with mini-batches. However, the batch size has a direct impact on the variance of gradients (the larger the batch the better the appoximation and the larger the memory usage). [default: %s]" % BATCHSIZE)
+                      help="The \"batch size\" to be used (= a number of samples processed before the model is updated). Batch size impacts learning significantly; typically networks train faster with mini-batches. However, the batch size has a direct impact on the variance of gradients (the larger the batch the better the appoximation and the larger the memory usage). [default: %s]" % BATCHSIZE)
 
     parser.add_option("--activation", dest="activation", type="string", default=ACTIVATION,
                       help="Type of transfer function that will be used to map the output of one layer to another [default: %s]" % ACTIVATION)

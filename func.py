@@ -471,7 +471,7 @@ def PlotROC(graphMap, saveDir, saveName, saveFormats):
     canvas = plot.CreateCanvas()
     canvas.cd()
 
-    leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
+    leg = plot.CreateLegend(0.25, 0.25, 0.60, 0.45) #0.50, 0.25, 0.85, 0.45
 
     # For-loop: All graphs
     for i, k in enumerate(graphMap["graph"], 0):
