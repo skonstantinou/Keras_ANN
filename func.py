@@ -10,6 +10,15 @@ import json
 #================================================================================================   
 # Function definition
 #================================================================================================   
+def Print(msg, printHeader=False):
+    fName = __file__.split("/")[-1]
+    if printHeader==True:
+        print "=== ", fName
+        print "\t", msg
+    else:
+        print "\t", msg
+    return
+   
 def convertHistoToGaph(histo, verbose=False):
                                                                                                                                                                                                             
     # Lists for values
@@ -47,7 +56,7 @@ def convertHistoToGaph(histo, verbose=False):
                                     array.array("d",yerrl),
                                     array.array("d",yerrh))
     if verbose:
-        tgraph.GetXaxis().SetLimits(0.0, 1.0)
+        tgraph.GetXaxis().SetLimits(-0.05, 1.0)
     tgraph.SetName(histo.GetName())
 
     # Construct info table (debugging)
@@ -174,9 +183,13 @@ def PlotInputs(signal, bkg, var, saveDir, saveFormats):
     canvas.Close()
     return
         
-def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
+def PlotAndWriteJSON(signal, bkg, saveDir, saveName, jsonWr, saveFormats):
 
-    # Create canvas
+    resultsDict = {}
+    resultsDict["signal"]     = signal
+    resultsDict["background"] = bkg
+ 
+   # Create canvas
     ROOT.gStyle.SetOptStat(0)
     canvas = plot.CreateCanvas()
     canvas.cd()
@@ -185,14 +198,18 @@ def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
     gList = []
     yMin  = 100000
     yMax  = -1
-    for i, key in enumerate(resDict.keys(), 0):
-        h = ROOT.TH1F(key, '', 50, 0.0, 1.0) 
-        for x in resDict[key]:
+
+    # For-loop: 
+    for i, key in enumerate(resultsDict.keys(), 0):
+
+        h = ROOT.TH1F(key, '', 50, 0.0, 1.0)             
+        for j, x in enumerate(resultsDict[key], 0):
             h.Fill(x)
-            yMin = min(x[0], yMin)        
-            # print "%d) yMin = %s, x = %s, type(x) = %s" % (i, yMin, x[0], type(x[0]))
-        if 0:
-            h.Scale(1./h.Integral())
+            try:
+                yMin = min(x[0], yMin)
+            except:
+                pass
+                
         # Save maximum
         yMax = max(h.GetMaximum(), yMax)
 
@@ -208,15 +225,20 @@ def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
     for i, h in enumerate(hList, 0):
         h.SetMinimum(yMin*0.85)        
         h.SetMaximum(yMax*1.15)
-        h.GetXaxis().SetTitle("Output")
-        h.GetYaxis().SetTitle("Entries")
+        h.GetXaxis().SetTitle("DNN output")
+        if "output" in saveName.lower():
+            h.GetYaxis().SetTitle("Entries")
+        elif "efficiency" in saveName.lower():
+            h.GetYaxis().SetTitle("Efficiency")
+        elif "significance" in saveName.lower():
+            h.GetYaxis().SetTitle("Significance")
+        else:
+            pass
+            
         if i==0:
             h.Draw("HIST")
         else:
             h.Draw("HIST SAME")
-    # What is this for? Ask soti
-    graph = plot.CreateGraph([0.5, 0.5], [0, yMax*1.1])
-    graph.Draw("same")
     
     # Create legend
     leg=plot.CreateLegend(0.6, 0.75, 0.9, 0.85)
@@ -230,18 +252,106 @@ def PlotAndGetGraphList(resDict, saveDir, saveName, saveFormats):
     # Create TGraph
     for h in hList:
         gList.append(convertHistoToGaph(h))
-    return gList
+
+    # Write the Tgraph into the JSON file
+    for gr in gList:
+        gName = "%s_%s" % (saveName, gr.GetName())
+        jsonWr.addGraph(gName, gr)
+    return
+
+def PlotTGraph(xVals, xErrs, yVals, yErrs, saveDir, saveName, jsonWr, saveFormats):
+
+    # Create a TGraph object
+    graph = plot.GetGraph(xVals, yVals, xErrs, xErrs, yErrs, yErrs)
+ 
+    # Create a TCanvas object
+    ROOT.gStyle.SetOptStat(0)
+    canvas = plot.CreateCanvas()
+    canvas.cd()
+    #canvas.SetLogy()
+    
+    # Create the TGraph with asymmetric errors                                                                                                                                                              
+    tgraph = ROOT.TGraphAsymmErrors(len(xVals),
+                                    array.array("d", xVals),
+                                    array.array("d", yVals),
+                                    array.array("d", xErrs),
+                                    array.array("d", xErrs),
+                                    array.array("d", yErrs),
+                                    array.array("d", yErrs))
+    tgraph.SetName(saveName)
+    if "efficiency" in saveName.lower():
+        legName = "efficiency"
+        if saveName.lower().endswith("sig"):
+            plot.ApplyStyle(tgraph, ROOT.kBlue)
+        else:
+            plot.ApplyStyle(tgraph, ROOT.kRed)
+    elif "significance" in saveName.lower():
+        legName = "significance"
+        if saveName.lower().endswith("sig"):
+            plot.ApplyStyle(tgraph, ROOT.kGreen)
+        else:
+            plot.ApplyStyle(tgraph, ROOT.kGreen+3)
+    else:
+        plot.ApplyStyle(tgraph, ROOT.kOrange)
+        
+    # Draw the TGraph
+    tgraph.GetXaxis().SetLimits(-0.05, 1.0)
+    #tgraph.SetMaximum(1.1)
+    #tgraph.SetMinimum(0)
+    tgraph.Draw("AC")
+        
+    # Create legend
+    leg = plot.CreateLegend(0.60, 0.70, 0.85, 0.80)
+    leg.AddEntry(tgraph, legName, "l")
+    leg.Draw()
+
+    plot.SavePlot(canvas, saveDir, saveName, saveFormats)
+    canvas.Close()
+
+    # Write the Tgraph into the JSON file
+    jsonWr.addGraph(saveName, tgraph)
+    return
+
+def GetEfficiency(histo):
+
+    # Initialize sigma variables
+    nbins    = histo.GetNbinsX()
+    intErrs  = ROOT.Double(0.0)
+    intVals  = histo.IntegralAndError(0, nbins+1, intErrs, "")
+    xVals    = []
+    xErrs    = []
+    yVals    = []
+    yErrs    = []
+    yTmp     = ROOT.Double(0.0)
+    
+    # For-loop: All bins
+    for i in range(0, nbins+1):
+        xVal = histo.GetBinCenter(i)
+        if xVal < 0.0:
+            continue
+        xErr = histo.GetBinWidth(i)*0.5
+        intBin = histo.IntegralAndError(i, nbins+1, yTmp, "")
+        yVals.append(intBin/intVals)
+        xVals.append(xVal)
+        xErrs.append(xErr)
+        yErrs.append(yTmp/intVals)
+    return xVals, xErrs, yVals, yErrs
+
 
 def CalcEfficiency(htest_s, htest_b):
-    nbins = htest_s.GetNbinsX()
+
     # Initialize sigma variables
+    nbins    = htest_s.GetNbinsX()
     sigmaAll = ROOT.Double(0.0)
     sigmaSel = ROOT.Double(0.0)
-
-    All_s = htest_s.IntegralAndError(0, nbins+1, sigmaAll, "")
-    All_b = htest_b.IntegralAndError(0, nbins+1, sigmaAll, "")
-
-    eff_s = []; eff_b = []; xvalue = []; error = []
+    All_s    = htest_s.IntegralAndError(0, nbins+1, sigmaAll, "")
+    All_b    = htest_b.IntegralAndError(0, nbins+1, sigmaAll, "")
+    eff_s    = []
+    eff_b    = [] 
+    xvalue   = []
+    error    = []
+    
+    # For-loop: All bins
     for i in range(0, nbins+1):
         Sel_s = htest_s.IntegralAndError(i, nbins+1, sigmaSel, "")
         Sel_b = htest_b.IntegralAndError(i, nbins+1, sigmaSel, "")
@@ -257,6 +367,9 @@ def CalcEfficiency(htest_s, htest_b):
         eff_b.append(Sel_b/All_b)
         error.append(0)
         xvalue.append(htest_s.GetBinCenter(i))
+    
+    #print "%d: %s" % (len(xvalue), xvalue)
+    #print "%d: %s" % (len(eff_s), eff_s)
     return xvalue, eff_s, eff_b, error
 
 def CalcSignificance(htest_s, htest_b):
@@ -280,6 +393,39 @@ def CalcSignificance(htest_s, htest_b):
         h_signif0.Fill(htest_s.GetBinCenter(i), _sign0)        
         h_signif1.Fill(htest_s.GetBinCenter(i), _sign1)        
     return h_signif0, h_signif1
+
+def GetSignificance(htest_s, htest_b):
+    nbinsX     = htest_s.GetNbinsX()
+    sigmaSel_s = ROOT.Double(0.0)
+    sigmaSel_b = ROOT.Double(0.0)
+    xVals      = []
+    xErrs      = []
+    signif_def = [] # S/sqrt(S+B) - same definition as TMVA
+    signif_alt = [] # 2[sqrt(S+B) -sqrt(B)]
+
+    # For-loop: All histogram bins
+    for i in range(0, nbinsX+1):
+        xVal = htest_s.GetBinCenter(i)
+        if xVal < 0.0:
+            continue
+        xErr = htest_s.GetBinWidth(i)*0.5
+
+        # Get selected events                                                                                                                                                                       
+        sSel = htest_s.IntegralAndError(i, nbinsX+1, sigmaSel_s, "")
+        bSel = htest_b.IntegralAndError(i, nbinsX+1, sigmaSel_b, "")
+
+        # Calculate Significance
+        _sign0 = 0
+        if (sSel+bSel > 0):
+            _sign0 = sSel/math.sqrt(sSel+bSel)
+        _sign1 = 2*(math.sqrt(sSel+bSel) - math.sqrt(bSel))
+
+        # Append values
+        xVals.append(xVal)
+        xErrs.append(xErr)
+        signif_def.append(_sign0)
+        signif_alt.append(_sign1)
+    return xVals, xErrs, signif_def, signif_alt
 
 def PlotEfficiency(htest_s, htest_b, saveDir, saveName, saveFormats):
     ROOT.gStyle.SetOptStat(0)
@@ -373,9 +519,10 @@ def PlotROC(graphMap, saveDir, saveName, saveFormats):
     canvas = plot.CreateCanvas()
     canvas.cd()
 
-    leg=plot.CreateLegend(0.50, 0.25, 0.85, 0.45)    
+    leg = plot.CreateLegend(0.25, 0.25, 0.60, 0.45) #0.50, 0.25, 0.85, 0.45
 
-    for i in range(len(graphMap)):
+    # For-loop: All graphs
+    for i, k in enumerate(graphMap["graph"], 0):
         gr = graphMap["graph"][i]
         gr_name = graphMap["name"][i]
         plot.ApplyStyle(gr, i+2)
@@ -434,28 +581,32 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     canvas.cd()
     canvas.SetLogy()
 
-    hList = []
+    hList     = []
     DataList = [Y_train_S, Y_test_S, Y_train_B, Y_test_B]
-    ymax = 0
-    nbins = 500
-    htrain_s=ROOT.TH1F('train_s', '', nbins, 0.0, 1.)
+    ymax     = 0
+    nbins    = 500
+    
+    # Create the histograms
+    htrain_s = ROOT.TH1F('train_s', '', nbins, 0.0, 1.0)
+    htest_s  = ROOT.TH1F('test_s' , '', nbins, 0.0, 1.0)
+    htrain_b = ROOT.TH1F('train_b', '', nbins, 0.0, 1.0)
+    htest_b  = ROOT.TH1F('test_b' , '', nbins, 0.0, 1.0)
+
+    # Append to list
     hList.append(htrain_s)
-    htest_s=ROOT.TH1F('test_s', '', nbins, 0.0, 1.)
     hList.append(htest_s)
-    htrain_b=ROOT.TH1F('train_b', '', nbins, 0.0, 1.)
     hList.append(htrain_b)
-    htest_b=ROOT.TH1F('test_b', '', nbins, 0.0, 1.)
     hList.append(htest_b)
-            
+    
     for i in range(len(DataList)):
         for r in DataList[i]:
             hList[i].Fill(r)            
 
+    # Clone the histograms
     htrain_s1 = htrain_s.Clone("train_s")
     htrain_b1 = htrain_b.Clone("train_b")
     htest_s1  = htest_s.Clone("test_s")
     htest_b1  = htest_b.Clone("test_b")
-
     drawStyle = "HIST SAME"
     leg=plot.CreateLegend(0.55, 0.68, 0.85, 0.88)
 
@@ -466,15 +617,16 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
         leg.AddEntry(h, legText, legStyle)
         ApplyStyle(h)
 
-    ymax = max (htrain_s.GetMaximum(), htest_s.GetMaximum(), htrain_b.GetMaximum(), htest_b.GetMaximum())
+    ymax = max(htrain_s.GetMaximum(), htest_s.GetMaximum(), htrain_b.GetMaximum(), htest_b.GetMaximum())
     for h in hList:
         h.SetMaximum(ymax*2)        
         h.Draw(DrawStyle(h.GetName())+" SAME")
 
-    graph = plot.CreateGraph([0.5, 0.5], [0, ymax*2])
-    graph.Draw("same")
-    leg.Draw()
-
+    #graph = plot.CreateGraph([0.5, 0.5], [0, ymax*2])
+    #graph.Draw("same")
+    #leg.Draw()
+    
+    # Save & close canvas
     plot.SavePlot(canvas, saveDir, saveName, saveFormats)
     canvas.Close()
     return htrain_s1, htest_s1, htrain_b1, htest_b1
@@ -530,7 +682,7 @@ def WriteModel(model, model_json, output):
                 # Store bias values (shifts the activation function : output[i] = (Sum(weights[i,j]*inputs[j]) + bias[i]))
                 biases = model.layers[index].get_weights()[1]
                 fout.write(str(biases) + '\n')
-        print 'Writing model in', output
+        Print('Writing model in file %s' % (output), True)
         return
 
 
