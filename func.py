@@ -631,13 +631,18 @@ def PlotOvertrainingTest(Y_train_S, Y_test_S, Y_train_B, Y_test_B, saveDir, save
     canvas.Close()
     return htrain_s1, htest_s1, htrain_b1, htest_b1
 
-            
-def WriteModel(model, model_json, output):
+
+def WriteModel(model, model_json, inputList, output):
     '''
     Write model weights and architecture in txt file
     '''
     arch = json.loads(model_json)
     with open(output, 'w') as fout:
+        #Store input variable names
+        fout.write('inputs ' + str(len(inputList)) + '\n')
+        for var in inputList:
+            fout.write(var + '\n')
+                   
         # Store number of layers
         fout.write( 'layers ' + str(len(model.layers)) + '\n')
         layers = []
@@ -684,5 +689,3 @@ def WriteModel(model, model_json, output):
                 fout.write(str(biases) + '\n')
         Print('Writing model in file %s' % (output), True)
         return
-
-

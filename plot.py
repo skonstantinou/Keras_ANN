@@ -66,8 +66,7 @@ def getDirName(dirName, baseDir=None):
     dirName = "/afs/cern.ch/user/%s/%s/public/html/%s" % (usrInit, usrName, dirName)
     return dirName
 
-def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=False):
-    
+def CreateDir(saveDir):
     # Create output directory if it does not exist
     if not os.path.exists(saveDir):
         os.mkdir(saveDir)
@@ -76,7 +75,13 @@ def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=Fal
     else:
         if 0:
             print "Output saved under", saveDir
-            
+    return
+
+def SavePlot(canvas, saveDir, saveName, saveFormats=["pdf", "root"], verbose=True):
+    
+    # Create output directory if it does not exist
+    CreateDir(saveDir)
+
     savePath = "%s/%s" % (saveDir, saveName)
     usrInit =  getpass.getuser()[0]
     saveURL  = savePath.replace("/afs/cern.ch/user/%s/" %(usrInit),"https://cmsdoc.cern.ch/~")

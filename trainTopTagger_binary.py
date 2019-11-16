@@ -204,8 +204,7 @@ func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test", 1, ["pdf"])
 htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest", ["pdf"])
 func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf", ["pdf"])
 
+# Plot ROC curve
 graph1 = func.GetROC(htest_s, htest_b)
-graph2 = func.GetROC(htest_b, htest_s)
-
-graph_roc = {"graph" : [graph1, graph2], "name" : ["graph 1", "graph 2"]}
+graph_roc = {"graph" : [graph1], "name" : ["graph 1"]}
 func.PlotROC(graph_roc, dirName, "ROC", ["pdf"])
