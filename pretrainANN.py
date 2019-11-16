@@ -23,6 +23,28 @@ from scipy.stats import pearsonr
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' #Disable AVX/FMA Warning
 
+#Run in single CPU: this ensures reproducible results!
+config = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1,
+                        allow_soft_placement=True, device_count = {'CPU': 1})
+session = tf.Session(config=config)
+K.set_session(session)
+
+ACT1 = 'relu'
+ACT2 = 'relu'
+ACT3 = 'sigmoid'
+ACT4 = 'sigmoid'
+ACT5 = 'sigmoid'
+OPT = 'adam'
+from optparse import OptionParser
+parser = OptionParser(usage="Usage: %prog [options]")
+parser.add_option("--act1",dest="act1",  default=ACT1,   help="Activation function 1 (Default: %s)" % ACT1)
+parser.add_option("--act2",dest="act2",  default=ACT2,   help="Activation function 2 (Default: %s)" % ACT2)
+parser.add_option("--act3",dest="act3",  default=ACT3,   help="Activation function 3 (Default: %s)" % ACT3)
+parser.add_option("--act4",dest="act4",  default=ACT4,   help="Activation function 2 (Default: %s)" % ACT4)
+parser.add_option("--act5",dest="act5",  default=ACT5,   help="Activation function 3 (Default: %s)" % ACT5)
+parser.add_option("--opt",dest="opt",  default=OPT,   help="Regressor: Optimizer (Default: %s)" % OPT)
+opt, args = parser.parse_args()
+
 def getInputs():
     inputList = []
     inputList.append("TrijetPtDR")
@@ -32,8 +54,8 @@ def getInputs():
     inputList.append("TrijetSubldgJetBDisc")
     inputList.append("TrijetBJetLdgJetMass")
     inputList.append("TrijetBJetSubldgJetMass")
-    #inputList.append("TrijetMass")
-    #inputList.append("TrijetDijetMass")
+    inputList.append("TrijetMass")
+    inputList.append("TrijetDijetMass")
     inputList.append("TrijetBJetBDisc")
     inputList.append("TrijetSoftDrop_n2")
     inputList.append("TrijetLdgJetCvsL")
@@ -71,6 +93,9 @@ nepochs  = 5000
 nbatch   = 100
 lam = 10
 
+print "Classifier: Activations: %s_%s_%s_sigmoid" % (opt.act1, opt.act2, opt.act3)
+print "Regressor:  Activations: %s_%s" % (opt.act5, opt.act4)
+print "Regressor:  OptimizerL %s" % (opt.opt)
 if 0:
     nepochs = 10
     nbatch = 5000
@@ -123,11 +148,12 @@ numpy.random.seed(seed)
 X_train, X_test, Y_train, Y_test, target_train, target_test = train_test_split(
     X, Y, target, test_size=0.5, random_state=seed, shuffle=True)
 
+
 inputs = Input(shape=(X_train.shape[1],))
-Dx = Dense(32, activation="relu")(inputs)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(1, activation="sigmoid")(Dx)
+Dx = Dense(32, activation=opt.act1)(inputs)
+Dx = Dense(32, activation=opt.act2)(Dx)
+Dx = Dense(32, activation=opt.act3)(Dx)
+Dx = Dense(1, activation='sigmoid')(Dx)
 D = Model(inputs=[inputs], outputs=[Dx])
 D.compile(loss="binary_crossentropy", optimizer="adam")
 
@@ -144,25 +170,26 @@ for i in range(20):
 
 inputs = Input(shape=(X_train.shape[1],))
 
-Dx = Dense(32, activation="relu")(inputs)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(32, activation="relu")(Dx)
-Dx = Dense(1, activation="sigmoid")(Dx)
+Dx = Dense(32, activation=opt.act1)(inputs)
+Dx = Dense(32, activation=opt.act2)(Dx)
+Dx = Dense(32, activation=opt.act3)(Dx)
+Dx = Dense(1, activation='sigmoid')(Dx)
 D = Model(inputs=[inputs], outputs=[Dx])
 
 inp_target = Input(shape=(y_predD.shape[1],))
-Rx = Dense(16, activation="relu")(inp_target) #epochs = 10, dense = 16
-Rx = Dense(1, activation = "relu")(Rx)
+Rx = Dense(16, activation=opt.act4)(inp_target) #epochs = 10, dense = 16
+Rx = Dense(1, activation = opt.act5)(Rx)
 R = Model(inputs=[inp_target], outputs=[Rx])
 
 print "===D model"
 D.summary()
 print "===R model"
 R.summary()
-R.compile(loss="msle", optimizer="adam")
-R.fit(Y_train, target_train, validation_data=(Y_test, target_test), epochs=10, verbose=1)
+R.compile(loss="msle", optimizer=opt.opt)
+R.fit(Y_train, target_train, validation_data=(Y_test, target_test), epochs=5, verbose=1)
 
-y_pred = R.predict(y_predD)
-for i in range(20):
-    print("Predicted=%.3f (%.3f) (%.3f) (%.3f)"% (target_test[i], y_pred[i], Y_test[i], y_predD[i]))
+#y_pred = R.predict(y_predD)
+#for i in range(20):
+#    print("Predicted=%.3f (%.3f) (%.3f) (%.3f)"% (target_test[i], y_pred[i], Y_test[i], y_predD[i]))
+
 
