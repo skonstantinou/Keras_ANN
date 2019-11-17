@@ -463,7 +463,7 @@ def main(opts):
     model.save(modelName)
         
     # write weights and architecture in txt file
-    func.WriteModel(model, model_json, os.path.join(opts.saveDir, "model.txt") )
+    func.WriteModel(model, model_json, inputList, os.path.join(opts.saveDir, "model.txt") )
 
     # Produce method score (i.e. predict output value for given input dataset). Computation is done in batches.
     # https://stackoverflow.com/questions/49288199/batch-size-in-model-fit-and-model-predict
