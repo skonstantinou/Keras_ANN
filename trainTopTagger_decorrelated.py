@@ -1,4 +1,27 @@
 #!/usr/bin/env python
+'''
+DESCRIPTION:
+This script is used to develop a mass-decorrelated top-quark tagger using a Neural Network architecture. 
+The model identifies hadronically decaying top-quarks using as input a list of discriminating variables of 
+truth-matched (signal) or unmatched (background) trijet combinations. 
+For the mass decorrelated tagger we develop an Adversarial Neural Network that consists of two models:
+ 1. Classifer: The nominal model that takes as input the set of input variables and gives as output 
+               a value from 0 to 1 that characterizes an object as signal or background. 
+               Loss function: L_c
+ 2. Regressor: This model is introduced in order to prevent the classifier from learning the top-quark mass.
+               It takes as input the output of the classifier and its output is a prediction of the top-quark mass.
+               Loss function: L_r
+Combining the two models, we get a new Neural Network that minimizes a joint Loss functions: L = L_c - lambda*L_r
+The factor lambda controls the mass independence and the performance of the classifier. 
+During a training epoch, both classifier and regressor are trained and after each iteration, the models use 
+the updated weights.
+During the training, we expect an increase of the loss value of the classifier and the regressor, and at the same
+time the minimization of the joint loss function.
+
+LAST USED: 
+./trainTopTagger_decorrelated.py --neurons_clf 32,32,32,1 --neurons_reg 16,1 --activ_clf relu,relu,relu,sigmoid --activ_reg tanh,relu --lam 5
+'''
+
 import keras
 import uproot
 import numpy
@@ -13,12 +36,9 @@ import tensorflow as tf
 from array import array
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation, Flatten, Input
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from sklearn.externals import joblib
 import keras.backend as K
 from keras.optimizers import SGD, Adam
-from sklearn.metrics import roc_auc_score
 
 import plot
 import func
@@ -92,17 +112,17 @@ def PlotLossFunction(losses, nepochs, saveDir):
         hLr.Draw("p same")
         hLfr.Draw("p same")
         
-        leg.AddEntry(hLf, "L_{f}","ple")
-        leg.AddEntry(hLr,"L_{r}","ple")
-        leg.AddEntry(hLfr,"L_{f} - L_{r}","ple")
+        leg.AddEntry(hLf, "L_{c}","pl")
+        leg.AddEntry(hLr,"L_{r}","pl")
+        leg.AddEntry(hLfr,"L_{c} - L_{r}","pl")
 
-    else: #fixme! problem for lambda = 0
+    else:
         h_loss = ROOT.TGraph(len(xarr), array('d', xarr), array('d', losses["loss"]))
         ymax = h_loss.GetHistogram().GetMaximum()
         ymin = h_loss.GetHistogram().GetMinimum()
         ApplyStyle(h_loss, ymin, ymax,  ROOT.kGreen +1)
         h_loss.Draw("pa")
-        leg.AddEntry(h_loss, "L_{f}","ple")
+        leg.AddEntry(h_loss, "L_{c}","pl")
 
     leg.Draw()
     saveName = "Loss_lam%s_opt%s" %(opt.lam, opt.opt)
@@ -141,27 +161,32 @@ def getInputs():
 # Get Classifier
 ###########################################################
 
-def getClassifier(model_clf, nInputs):
-    model_clf.add(Dense(32, input_dim =  nInputs)) 
-    model_clf.add(Activation('relu')) 
-    model_clf.add(Dense(32))
-    model_clf.add(Activation('relu')) 
-    model_clf.add(Dense(32))
-    model_clf.add(Activation('relu')) 
-    model_clf.add(Dense(1))
-    model_clf.add(Activation('sigmoid')) 
+def getClassifier(model_clf, nInputs):        
+    # Add classifier layers
+    for iLayer, n in enumerate(opt.neurons_clf, 0):
+        # First layer demands input_dim
+        if (iLayer == 0):
+            model_clf.add(Dense(opt.neurons_clf[iLayer], input_dim =  nInputs)) 
+            model_clf.add(Activation(opt.activ_clf[iLayer])) 
+        else:
+            model_clf.add(Dense(opt.neurons_clf[iLayer]))
+            model_clf.add(Activation(opt.activ_clf[iLayer]))
+
     return model_clf
 
 ###########################################################
 # Get Regressor
 ###########################################################
 
-def getRegressor(model_clf,model_reg):    
+def getRegressor(model_clf, model_reg):    
+    # Add classifier
     model_reg.add(model_clf)
-    model_reg.add(Dense(16))
-    model_reg.add(Activation(opt.act1))
-    model_reg.add(Dense(1))
-    model_reg.add(Activation(opt.act2))
+
+    # Add regressor layers
+    for iLayer, n in enumerate(opt.neurons_reg, 0):
+        model_reg.add(Dense(opt.neurons_reg[iLayer]))
+        model_reg.add(Activation(opt.activ_reg[iLayer]))
+
     return model_reg
 
 ###########################################################
@@ -217,8 +242,12 @@ def main():
     nepochs    = opt.nepochs
     lam        = opt.lam
     batch_size = opt.batch_size
+    
+    # Extra text: 
     _lr        = str(opt.lr)
-    extra_text = "%s_%s_%s_%s_%s_%s_%s" % (opt.batch_size, opt.opt, _lr.replace(".","p"), opt.nepochs, opt.act1, opt.act2, opt.loss_reg)
+    extra_text = "batch%s_Opt%s_LR%s_Epoch%s_NLayerClf%s_NLayerReg%s" % (opt.batch_size, opt.opt, _lr.replace(".","p"), opt.nepochs, len(opt.activ_clf), len(opt.activ_reg))
+    saveDir    = plot.getDirName("TopTag_%s" % extra_text)
+
     if (opt.debug):
         print "extra_text: %s" % extra_text
 
@@ -272,7 +301,12 @@ def main():
     target = dataset_target_all[:2*nsignal, :]
 
     # Is this needed?
-    numpy.random.seed(seed)
+    #numpy.random.seed(seed)
+
+    # Plot input variables
+    if (opt.plotInputs):
+        for i, var in enumerate(inputList, 0):
+            func.PlotInputs(dset_signal[:, i:i+1], dset_background[:, i:i+1], var, "%s/%s" % (saveDir, "inputs"), opt.saveFormats)
 
     # Get training and test samples
     X_train, X_test, Y_train, Y_test, target_train, target_test = train_test_split(
@@ -304,7 +338,12 @@ def main():
     model_clf = getClassifier(model_clf, nInputs)
     model_reg = Sequential()
     model_reg = getRegressor(model_clf, model_reg)
-    
+
+    # Print the summary of classifier, regressor
+    if opt.debug:
+        model_clf.summary()
+        model_reg.summary()
+
     # Compile classifier (loss function: binary crossentropy, optimizer: adam)
     model_clf.compile(loss="binary_crossentropy", optimizer="adam")
     
@@ -387,7 +426,7 @@ def main():
             losses["L_f"].append(lf)
             losses["L_r"].append(lr)
             
-            if (i % (nepochs/10) == 0):
+            if (nepochs < 10) or (i % (nepochs/10) == 0):
                 print "=== Epoch: %s / %s. Losses: Lf = %.3f, Lr = %.3f, (L_f - L_r) = %.3f" % (i, nepochs, lf, lr, lfr)
            
             # if the loss function does not change after 100 epochs, return
@@ -444,19 +483,22 @@ def main():
     # Plot results:
     ###################################################
 
-    saveDir = plot.getDirName("TopTag_%s" % extra_text)
     # === Loss function vs # epoch
     if (lam > 0):
         last_epoch = len(losses["L_f - L_r"])
         PlotLossFunction(losses, last_epoch, saveDir)
     else:
         last_epoch = earlystop.stopped_epoch
+        if (last_epoch == 0):
+            # last_epoch = nepoch if the training does not stop before the last epoch
+            last_epoch = nepochs
+        print "last epoch", last_epoch
         PlotLossFunction(hist.history, last_epoch, saveDir)
         
     # === Overtraining test
-    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, saveDir, "OvertrainingTest_lam%s" % lam, ["pdf"])
+    htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, saveDir, "OvertrainingTest_lam%s" % lam, opt.saveFormats)
     # === Efficiency
-    func.PlotEfficiency(htest_s, htest_b, saveDir, "Efficiency_lam%s" % lam, ["pdf"])
+    func.PlotEfficiency(htest_s, htest_b, saveDir, "Efficiency_lam%s" % lam, opt.saveFormats)
 
     ###################################################
     # Save the model
@@ -510,17 +552,19 @@ if __name__ == "__main__":
     FILENAME     = "histograms-TT_19var.root"
     BATCH_SIZE   = 128
     LR           = 0.001 #Default for Adam Optomizer (For SGD the default value is 0.01)
-
-    #fixme
-    ACT1     = 'relu'
-    ACT2     = 'relu'
-    LOSS_REG = "msle"
+    ACTIV_CLF    = 'relu,relu,relu,sigmoid'
+    ACTIV_REG    = 'tanh,relu'
+    NEURONS_CLF  = '32,32,32,1'
+    NEURONS_REG  = '16,1'
+    LOSS_REG     = 'msle'
+    SAVEFORMATS  = ["pdf"]
+    PLOTINPUTS   = False
 
     from optparse import OptionParser
     parser = OptionParser(usage="Usage: %prog [options]")
     
-    parser.add_option("--filename",dest="filename",  default=FILENAME,  type = str,   help="Input root file (Default: %s)" % FILENAME)
-    parser.add_option("--lr",dest="lr",  default=LR,  type = float,   help="Learning Rate (Default: %s)" % LR)
+    parser.add_option("--filename",dest="filename",  default=FILENAME,  type = str,  help="Input root file (Default: %s)" % FILENAME)
+    parser.add_option("--lr",dest="lr",  default=LR,  type = float,   help="Learning Rate of the optimizer (Default: %s)" % LR)
     parser.add_option("--batch_size",dest="batch_size",  default=BATCH_SIZE,  type = int,   help="Batch Size (Default: %s)" % BATCH_SIZE)
     parser.add_option("--opt",dest="opt",  default=OPTIMIZER,   help="Optimizer (Default: %s)" % OPTIMIZER)
     parser.add_option("--lam",dest="lam",  default=LAMBDA,  type = int,   help="Lambda (Default: %s)" % LAMBDA)
@@ -529,12 +573,20 @@ if __name__ == "__main__":
     parser.add_option("--gridX", dest="gridX", action="store_true", default=GRIDX, help="Enable the x-axis grid lines [default: %s]" % GRIDX)
     parser.add_option("--gridY", dest="gridY", action="store_true", default=GRIDY, help="Enable the y-axis grid lines [default: %s]" % GRIDY)
     parser.add_option("--debug", dest="debug", action="store_true", default=DEBUG, help="Enable debugging mode [default: %s]" % DEBUG)
-    parser.add_option("--act1",dest="act1",  default=ACT1,   help="Activation function 1 (Default: %s)" % ACT1)
-    parser.add_option("--act2",dest="act2",  default=ACT2,   help="Activation function 2 (Default: %s)" % ACT2)
-    parser.add_option("--loss_reg",dest="loss_reg",  default=LOSS_REG,   help="Regressor loss function (Default: %s)" % LOSS_REG)
+    parser.add_option("--loss_reg", dest="loss_reg",  default=LOSS_REG,   help="Regressor loss function (Default: %s)" % LOSS_REG)
+    parser.add_option("--activ_clf",dest="activ_clf", type="string", default=ACTIV_CLF,
+                      help="List of activation functions of the classifier (comma-separated) [default: %s]" % ACTIV_CLF)
+    parser.add_option("--activ_reg", dest="activ_reg", type="string", default=ACTIV_REG,
+                      help="List of activation functions of the regressor (comma-separated) [default: %s]" % ACTIV_REG)    
+    parser.add_option("--neurons_clf", dest="neurons_clf", type="string", default=NEURONS_CLF,
+                      help="List of neurons to use for each classification layer (comma-separated integers)  [default: %s]" % NEURONS_CLF)
+    parser.add_option("--neurons_reg", dest="neurons_reg", type="string", default=NEURONS_REG,
+                      help="List of neurons to use for each regression layer (comma-separated integers)  [default: %s]" % NEURONS_REG)
+    parser.add_option("-s", "--saveFormats", dest="saveFormats", default=SAVEFORMATS, help="Save formats for all plots [default: %s]" % SAVEFORMATS)
+    parser.add_option("--plotInputs", dest="plotInputs", action="store_true", default=PLOTINPUTS, help="Plot the distributions of the input variables [default: %s]" % PLOTINPUTS)
+
     opt, args = parser.parse_args()
     
-
     # Define colors
     c_green = "\033[92m"
     c_white = "\033[0;0m"
@@ -547,29 +599,40 @@ if __name__ == "__main__":
     if (opt.lr != lr_def):
         Print("%sYou selected to use the %s optimizer with learing rate %s. The default value of the learing rate is %s.%s" % (c_green, opt.opt, opt.lr, lr_def, c_white), True)
         
-    '''
     # Create specification lists
-    if "," in opt.activation:
-        opt.activation = opt.activation.split(",")
+    print "=== Classifier"
+    if "," in opt.activ_clf:
+        opt.activ_clf = opt.activ_clf.split(",")
     else:
-        opt.activation = [opt.activation]
-    Print("Activation = %s" % (opt.activation), True)
-    if "," in opt.neurons:
-        opt.neurons = list(map(int, opt.neurons.split(",")) )
+        opt.activ_clf = [opt.activ_clf]
+    Print("Activation = %s" % (opt.activ_clf), True)
+    if "," in opt.neurons_clf:
+        opt.neurons_clf = list(map(int, opt.neurons_clf.split(",")) )
     else:
-        opt.neurons = list(map(int, [opt.neurons]))
-    Print("Neurons = %s" % (opt.neurons), True)
+        opt.neurons_clf = list(map(int, [opt.neurons_clf]))
+    Print("Neurons = %s" % (opt.neurons_clf), True)
 
-    # Sanity checks (One activation function for each layer)
-    if len(opt.neurons) != len(opt.activation):
-        msg = "The list of neurons (size=%d) is not the same size as the list of activation functions (=%d)" % (len(opt.neurons), len(opt.activation))
+    print "=== Regressor"
+    if "," in opt.activ_reg:
+        opt.activ_reg = opt.activ_reg.split(",")
+    else:
+        opt.activ_reg = [opt.activ_reg]
+    Print("Activation = %s" % (opt.activ_reg), True)
+    if "," in opt.neurons_reg:
+        opt.neurons_reg = list(map(int, opt.neurons_reg.split(",")) )
+    else:
+        opt.neurons_reg = list(map(int, [opt.neurons_reg]))
+    Print("Neurons = %s" % (opt.neurons_reg), True)
+
+    # Check if the number of layers in equal with the number of activation layers
+    if len(opt.neurons_clf) != len(opt.activ_clf):
+        msg = "== Classifier: The list of neurons (size=%d) is not the same size as the list of activation functions (=%d)" % (len(opt.neurons_clf), len(opt.activ_clf))
         raise Exception(c_green + msg + c_white)
-    '''
+    if len(opt.neurons_reg) != len(opt.activ_reg):
+        msg = "== Regressor: The list of neurons (size=%d) is not the same size as the list of activation functions (=%d)" % (len(opt.neurons_reg), len(opt.activ_reg))
+        raise Exception(c_green + msg + c_white)
+
     main()                                  
                                     
     # Problems:
-    # 1. Optimizer: Change the default value based on the type of the optimizer (Give a warning message !)
-    # 2. Check why the classifier's PRE pre-training affects the results
-    # 3. Give the layers, neurons and activation functions as a list 
-    # 4. Fix PlotLossFunction for Lambda == 0
-    # 5. Add description
+    # 1. Check why we need the classifier's PRE pre-training
