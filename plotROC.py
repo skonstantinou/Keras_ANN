@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+''' 
+DESCRIPTION:
+This script loads a set of mass-decorrelated top taggers with different lambda values and predicts their output. 
+The output of the script, is a comparison of the ROC curves of the given models (signal efficiency vs bkg efficiency)
+
+EXAMPLES:
+./plotROC.py
+'''
+
 import numpy
 import pandas
 import keras
@@ -133,3 +142,7 @@ def main():
     func.PlotROC(graph_roc, "TestROC", "plotROC", ["pdf"])
 
 main()
+
+# FIX:
+# 1. Give the *h5 files as input
+# 2. Give the lambda values as input

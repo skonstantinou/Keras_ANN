@@ -1,5 +1,27 @@
 #!/usr/bin/env python
-#uproot: https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281/319/rootTutorialWeek5_markhod_2018.pdf
+'''
+DESCRIPTION:
+--> This script is here for educational purposes. In our analysis we are using sequential.py or trainTopTagger_decorrelated.py
+
+This script is an example of training a simple Neural Network model using Keras.
+The model is a top-quark tagger that takes as input a list of discriminating variables, and predicts if a sample (trijet combination) is a top-quark or not. 
+
+The steps included are:
+1. Load Data.
+2. Define Keras Model.
+3. Compile Keras Model.
+4. Fit Keras Model.
+5. Save Keras model (Architecture and weights).
+5. Predict Keras Model.
+6. Plot output, efficiency (and significance) and ROC curve of Keras Model.
+
+ENV SETUP:
+cd CMSSW_10_2_11/src/ && cmsenv && setenv SCRAM_ARCH slc7_amd64_gcc700
+
+RUN:
+./trainTopTagger_binary.py
+'''
+
 import keras
 import uproot
 import numpy
@@ -124,35 +146,42 @@ model.add(Activation('relu'))
 model.add(Dense(nInputs))
 model.add(Activation('relu'))
 model.add(Dense(1))
-#model.add(Activation('softmax'))
 model.add(Activation('sigmoid'))
 
+# Print the summary of the model
 model.summary()
 
 #Split data into input (X) and output (Y)
 X = dataset[:2*nsignal,0:nInputs]
 Y = dataset[:2*nsignal,nInputs:]
-#
+
+# Get the signal and background datasets
 X_signal     = dset_signal[:nsignal, 0:nInputs]
 X_background = dset_background[:nsignal, 0:nInputs]
 
+# Split the dataset into training and testing
 X_train, X_test, Y_train, Y_test = train_test_split(
     X, Y, test_size=0.5, random_state=seed, shuffle=True)
 
+# Early stop:
 earlystop = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=50)
 callbacks_list = [earlystop]
 
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc']) #acc: accuracy #soti: Optimize loss function, optimizer
+# Compile the model (Loss function: binary crossentropy, optimizer: adam)
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc']) #acc: accuracy 
 
-modelName = "Model_%s.h5" % (filename.replace(".root",""))
-model.save(modelName)
+# Save the model before training 
+if not debug:
+    modelName = "Model_%s.h5" % (filename.replace(".root",""))
+    model.save(modelName)
 
+# Fit the model (training)
 hist = model.fit(
     X_train,
     Y_train,
     validation_data=(X_test, Y_test),
-    epochs=nepochs,    #soti: Optimize epochs!
-    batch_size=nbatch, #soti: Optimize batch size!
+    epochs=nepochs,    
+    batch_size=nbatch, 
     shuffle=False,
     verbose=1,
     callbacks=callbacks_list
@@ -171,7 +200,7 @@ if not debug:
     model.save(modelName)
     
     # write weights and architecture in txt file
-    func.WriteModel(model, model_json, "model_test.txt")
+    func.WriteModel(model, model_json, inputList, "model_test.txt")
 
 pred_train = model.predict(X_train)
 pred_test = model.predict(X_test)
@@ -181,27 +210,32 @@ pred_background = model.predict(X_background)
 XY_train     = numpy.concatenate((X_train, Y_train), axis=1)
 XY_test      = numpy.concatenate((X_test, Y_test), axis=1)
 
+# Split the training and testing datasets into signal and background
 x_train_S = XY_train[XY_train[:,nInputs] == 1]; x_train_S = x_train_S[:,0:nInputs]
 x_train_B = XY_train[XY_train[:,nInputs] == 0]; x_train_B = x_train_B[:,0:nInputs]
 x_test_S  = XY_test[XY_test[:,nInputs] == 1];   x_test_S  = x_test_S[:,0:nInputs]
 x_test_B  = XY_test[XY_test[:,nInputs] == 0];   x_test_B  = x_test_B[:,0:nInputs]
+
+# Calculate the output of the model for the four datasets (training signal, training bkg, testing signal, testing bkg)
 pred_train_S =  model.predict(x_train_S)
 pred_train_B =  model.predict(x_train_B)
 pred_test_S  =  model.predict(x_test_S)
 pred_test_B  =  model.predict(x_test_B)
 
+# Output directory
 dirName = plot.getDirName("TopTag")
 
-X_signal     = dset_signal[:nsignal, 0:nInputs]
-X_background = dset_background[:nsignal, 0:nInputs]
+# X_signal     = dset_signal[:nsignal, 0:nInputs]
+# X_background = dset_background[:nsignal, 0:nInputs]
 
-func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB", 1, ["pdf"])
-func.PlotOutput(pred_train, pred_test, dirName, "Output_pred", 0, ["pdf"])
-func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train", 1, ["pdf"])
-func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test", 1, ["pdf"])
+# func.PlotOutput(pred_signal, pred_background, dirName, "Output_SB", 1, ["pdf"])
+# func.PlotOutput(pred_train, pred_test, dirName, "Output_pred", 0, ["pdf"])
+# func.PlotOutput(pred_train_S, pred_train_B, dirName, "Output_SB_train", 1, ["pdf"])
+# func.PlotOutput(pred_test_S, pred_test_B, dirName, "Output_SB_test", 1, ["pdf"])
 
-# Calculate efficiency
+# Plot the output of the four datasets
 htrain_s, htest_s, htrain_b, htest_b = func.PlotOvertrainingTest(pred_train_S, pred_test_S, pred_train_B, pred_test_B, dirName, "OvertrainingTest", ["pdf"])
+# Calculate efficiency
 func.PlotEfficiency(htest_s, htest_b, dirName, "Efficiency.pdf", ["pdf"])
 
 # Plot ROC curve

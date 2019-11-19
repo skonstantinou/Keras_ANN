@@ -1,5 +1,14 @@
 #!/usr/bin/env python
-#uproot: https://www.indico.shef.ac.uk/event/11/contributions/338/attachments/281/319/rootTutorialWeek5_markhod_2018.pdf
+'''
+DESCRIPTION:
+This script is used to control the performance of the mass-decorrelated top tagger.
+The program defines two Keras model: a classifier and a regressor. The classifier is trained for a number of epochs. Using a testing sample, its output is predicted and given as input to the regressor. The output of the regressor is a prediction of the top-quark mass.
+This script is used to check that both classifier and regressor are normally trained.
+If one of them does not work, it is easy to detect and fix the problem (change the activation function, optimizer, number of layers, number of neurons etc)
+
+EXAMPLE: 
+./pretrainANN.py --act1 relu --act2 relu --act3 relu --act4 tanh --act5 relu --opt Adam
+'''
 import keras
 import uproot
 import numpy

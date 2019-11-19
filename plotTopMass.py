@@ -1,5 +1,17 @@
 #!/usr/bin/env python
-#Useful regression tutorial: https://machinelearningmastery.com/regression-tutorial-keras-deep-learning-library-python/
+''' 
+DESCRIPTION:
+This script loads a set of mass-decorrelated top taggers with different lambda values and predicts their output. 
+The output of the script, is the top-quark mass distribution of the selected top-candidates (truth-matched or 
+unmatched) that pass a given working point. 
+
+EXAMPLES:
+./plotTopMass.py 
+./plotTopMass.py --plotSignal
+./plotTopMass.py --plotSignal --wp 0.8 --setLogY --test
+./plotTopMass.py --filename histograms-QCD_19var.root
+'''
+
 import numpy
 import pandas
 import keras
@@ -18,13 +30,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 # Regression predictions
 from sklearn.datasets import make_regression
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from keras.models import load_model
-from sklearn.externals import joblib
 from keras.models import model_from_json
 from optparse import OptionParser
-#from rootpy.root2array import fill_hist_with_ndarray
 
 import plot
 import tdrstyle
@@ -137,22 +146,21 @@ def main():
         canvas.SetLogy()
         ymaxFactor = 2
         
-
     # load the models with different lambda
     for lam in lamValues:
         print "Lambda = ", lam
         if (lam == 0):
             # For labda = 0 load the simple classification (sequential) model
-            loaded_model = load_model('Model_relu_relu_relu_sigmoid.h5')
+            loaded_model = load_model('models_16Nov/Model_relu_relu_relu_sigmoid.h5')
         else:
-            loaded_model = load_model('modelANN_32_Adam_0p0008_500_tanh_relu_msle_lam%s.h5' % (lam))
+            loaded_model = load_model('models_16Nov/modelANN_32_Adam_0p0008_500_tanh_relu_msle_lam%s.h5' % (lam))
 
         # Compile the model
         loaded_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
         Y = loaded_model.predict(X, verbose=1)
         
         # Concatenate Y (predicted output) and target (top-quark mass)
-        # Ymass 0 column: output
+        # Ymass 0 column:   output
         # Ymass 1st column: top-quark mass
         Ymass = numpy.concatenate((Y, target), axis=1)
         
@@ -184,8 +192,9 @@ def main():
     
     # Create legend
     leg=plot.CreateLegend(0.6, 0.67, 0.9, 0.85)
+    #Legend text
     dText = dName
-    dText = dText.replace("TT", "t#bar{t}") #Legend text
+    dText = dText.replace("TT", "t#bar{t}")
 
     # Loop over the histograms in the histoList
     for i in range(len(histoList)):        
@@ -285,3 +294,7 @@ action..........: The basic type of action to be taken when this argument is enc
     (opts, parseArgs) = parser.parse_args()
 
 main()
+
+# FIX:
+# 1. Give the *h5 files as input
+# 2. Give the lambda values as input

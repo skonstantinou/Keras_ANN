@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+'''
+DESCRIPTION:
+This script plots and compares the ROC curve of an NN model and a BDT model.
+
+EXAMPLE:
+./plotROC_BDT.py
+'''
 import numpy
 import pandas
 import keras
@@ -131,3 +138,6 @@ def main():
     func.PlotROC(graph_roc, "TestROC", "NN_vs_BDTG", ["pdf", "C"])
 
 main()
+
+# FIX:
+# 1. Give the NN model the optimizer and the BDTG root file as input options
